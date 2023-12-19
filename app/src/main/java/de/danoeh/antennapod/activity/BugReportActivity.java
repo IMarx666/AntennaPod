@@ -4,13 +4,12 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import com.google.android.material.snackbar.Snackbar;
 
 import androidx.annotation.NonNull;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ShareCompat;
 import androidx.core.content.FileProvider;
@@ -21,10 +20,9 @@ import android.view.MenuItem;
 import android.widget.TextView;
 
 
-import de.danoeh.antennapod.core.preferences.ThemeSwitcher;
 import de.danoeh.antennapod.error.CrashReportWriter;
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.util.IntentUtils;
 import org.apache.commons.io.IOUtils;
 
@@ -41,7 +39,7 @@ public class BugReportActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        setTheme(ThemeSwitcher.getTheme(this));
+        setTheme(UserPreferences.getTheme());
         super.onCreate(savedInstanceState);
         getSupportActionBar().setDisplayShowHomeEnabled(true);
         setContentView(R.layout.bug_report);
@@ -68,10 +66,7 @@ public class BugReportActivity extends AppCompatActivity {
             ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
             ClipData clip = ClipData.newPlainText(getString(R.string.bug_report_title), crashDetailsTextView.getText());
             clipboard.setPrimaryClip(clip);
-            if (Build.VERSION.SDK_INT < 32) {
-                Snackbar.make(findViewById(android.R.id.content), R.string.copied_to_clipboard,
-                        Snackbar.LENGTH_SHORT).show();
-            }
+            Snackbar.make(findViewById(android.R.id.content), R.string.copied_to_clipboard, Snackbar.LENGTH_SHORT).show();
         });
     }
 
@@ -84,7 +79,7 @@ public class BugReportActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == R.id.export_logcat) {
-            MaterialAlertDialogBuilder alertBuilder = new MaterialAlertDialogBuilder(this);
+            AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this);
             alertBuilder.setMessage(R.string.confirm_export_log_dialog_message);
             alertBuilder.setPositiveButton(R.string.confirm_label, (dialog, which) -> {
                 exportLog();

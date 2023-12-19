@@ -6,6 +6,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -18,7 +19,9 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.activity.result.contract.ActivityResultContracts.GetContent;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import com.google.android.material.snackbar.Snackbar;
@@ -27,7 +30,6 @@ import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.activity.OnlineFeedViewActivity;
 import de.danoeh.antennapod.activity.OpmlImportActivity;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.core.storage.DBTasks;
 import de.danoeh.antennapod.model.feed.SortOrder;
@@ -67,14 +69,15 @@ public class AddFeedFragment extends Fragment {
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         super.onCreateView(inflater, container, savedInstanceState);
-        viewBinding = AddfeedBinding.inflate(inflater);
+        viewBinding = AddfeedBinding.inflate(getLayoutInflater());
         activity = (MainActivity) getActivity();
 
+        Toolbar toolbar = viewBinding.toolbar;
         displayUpArrow = getParentFragmentManager().getBackStackEntryCount() != 0;
         if (savedInstanceState != null) {
             displayUpArrow = savedInstanceState.getBoolean(KEY_UP_ARROW);
         }
-        ((MainActivity) getActivity()).setupToolbarToggle(viewBinding.toolbar, displayUpArrow);
+        ((MainActivity) getActivity()).setupToolbarToggle(toolbar, displayUpArrow);
 
         viewBinding.searchItunesButton.setOnClickListener(v
                 -> activity.loadChildFragment(OnlineSearchFragment.newInstance(ItunesPodcastSearcher.class)));
@@ -104,6 +107,9 @@ public class AddFeedFragment extends Fragment {
         });
 
         viewBinding.addLocalFolderButton.setOnClickListener(v -> {
+            if (Build.VERSION.SDK_INT < 21) {
+                return;
+            }
             try {
                 addLocalFolderLauncher.launch(null);
             } catch (ActivityNotFoundException e) {
@@ -112,6 +118,10 @@ public class AddFeedFragment extends Fragment {
                         .showSnackbarAbovePlayer(R.string.unable_to_start_system_file_manager, Snackbar.LENGTH_LONG);
             }
         });
+        if (Build.VERSION.SDK_INT < 21) {
+            viewBinding.addLocalFolderButton.setVisibility(View.GONE);
+        }
+
         viewBinding.searchButton.setOnClickListener(view -> performSearch());
 
         return viewBinding.getRoot();
@@ -124,22 +134,23 @@ public class AddFeedFragment extends Fragment {
     }
 
     private void showAddViaUrlDialog() {
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(getContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle(R.string.add_podcast_by_url);
-        final EditTextDialogBinding dialogBinding = EditTextDialogBinding.inflate(getLayoutInflater());
-        dialogBinding.urlEditText.setHint(R.string.add_podcast_by_url_hint);
+        View content = View.inflate(getContext(), R.layout.edit_text_dialog, null);
+        EditTextDialogBinding alertViewBinding = EditTextDialogBinding.bind(content);
+        alertViewBinding.urlEditText.setHint(R.string.add_podcast_by_url_hint);
 
         ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
         final ClipData clipData = clipboard.getPrimaryClip();
         if (clipData != null && clipData.getItemCount() > 0 && clipData.getItemAt(0).getText() != null) {
             final String clipboardContent = clipData.getItemAt(0).getText().toString();
             if (clipboardContent.trim().startsWith("http")) {
-                dialogBinding.urlEditText.setText(clipboardContent.trim());
+                alertViewBinding.urlEditText.setText(clipboardContent.trim());
             }
         }
-        builder.setView(dialogBinding.getRoot());
+        builder.setView(alertViewBinding.getRoot());
         builder.setPositiveButton(R.string.confirm_label,
-                (dialog, which) -> addUrl(dialogBinding.urlEditText.getText().toString()));
+                (dialog, which) -> addUrl(alertViewBinding.urlEditText.getText().toString()));
         builder.setNegativeButton(R.string.cancel_label, null);
         builder.show();
     }
@@ -152,7 +163,8 @@ public class AddFeedFragment extends Fragment {
 
     private void performSearch() {
         viewBinding.combinedFeedSearchEditText.clearFocus();
-        InputMethodManager in = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+        InputMethodManager in = (InputMethodManager)
+                getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
         in.hideSoftInputFromWindow(viewBinding.combinedFeedSearchEditText.getWindowToken(), 0);
         String query = viewBinding.combinedFeedSearchEditText.getText().toString();
         if (query.matches("http[s]?://.*")) {
@@ -160,7 +172,6 @@ public class AddFeedFragment extends Fragment {
             return;
         }
         activity.loadChildFragment(OnlineSearchFragment.newInstance(CombinedSearcher.class, query));
-        viewBinding.combinedFeedSearchEditText.post(() -> viewBinding.combinedFeedSearchEditText.setText(""));
     }
 
     @Override
@@ -197,8 +208,11 @@ public class AddFeedFragment extends Fragment {
     }
 
     private Feed addLocalFolder(Uri uri) {
-        getActivity().getContentResolver().takePersistableUriPermission(uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        if (Build.VERSION.SDK_INT < 21) {
+            return null;
+        }
+        getActivity().getContentResolver()
+                .takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
         DocumentFile documentFile = DocumentFile.fromTreeUri(getContext(), uri);
         if (documentFile == null) {
             throw new IllegalArgumentException("Unable to retrieve document tree");
@@ -211,11 +225,12 @@ public class AddFeedFragment extends Fragment {
         dirFeed.setItems(Collections.emptyList());
         dirFeed.setSortOrder(SortOrder.EPISODE_TITLE_A_Z);
         Feed fromDatabase = DBTasks.updateFeed(getContext(), dirFeed, false);
-        FeedUpdateManager.runOnce(requireContext(), fromDatabase);
+        DBTasks.forceRefreshFeed(getContext(), fromDatabase, true);
         return fromDatabase;
     }
 
     private static class AddLocalFolder extends ActivityResultContracts.OpenDocumentTree {
+        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
         @NonNull
         @Override
         public Intent createIntent(@NonNull final Context context, @Nullable final Uri input) {

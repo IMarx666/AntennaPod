@@ -8,8 +8,9 @@ import android.content.Context;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
-import de.danoeh.antennapod.core.storage.DBTasks;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
+import de.danoeh.antennapod.core.service.download.DownloadRequest;
+import de.danoeh.antennapod.core.service.download.DownloadService;
+import de.danoeh.antennapod.core.service.download.DownloadRequestCreator;
 import org.apache.commons.io.IOUtils;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -29,7 +30,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 
 import de.danoeh.antennapod.core.export.opml.OpmlElement;
 import de.danoeh.antennapod.core.export.opml.OpmlReader;
@@ -144,10 +144,9 @@ public class OpmlBackupAgent extends BackupAgentHelper {
                 mChecksum = digester == null ? null : digester.digest();
                 for (OpmlElement opmlElem : opmlElements) {
                     Feed feed = new Feed(opmlElem.getXmlUrl(), null, opmlElem.getText());
-                    feed.setItems(Collections.emptyList());
-                    DBTasks.updateFeed(mContext, feed, false);
+                    DownloadRequest request = DownloadRequestCreator.create(feed).build();
+                    DownloadService.download(mContext, false, request);
                 }
-                FeedUpdateManager.runOnce(mContext);
             } catch (XmlPullParserException e) {
                 Log.e(TAG, "Error while parsing the OPML file", e);
             } catch (IOException e) {

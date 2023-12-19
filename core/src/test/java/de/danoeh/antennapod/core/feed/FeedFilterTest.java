@@ -21,8 +21,8 @@ public class FeedFilterTest {
 
         assertFalse(filter.excludeOnly());
         assertFalse(filter.includeOnly());
-        assertEquals("", filter.getExcludeFilterRaw());
-        assertEquals("", filter.getIncludeFilterRaw());
+        assertEquals("", filter.getExcludeFilter());
+        assertEquals("", filter.getIncludeFilter());
         assertTrue(filter.shouldAutoDownload(item));
     }
 
@@ -38,8 +38,8 @@ public class FeedFilterTest {
 
         assertFalse(filter.excludeOnly());
         assertTrue(filter.includeOnly());
-        assertEquals("", filter.getExcludeFilterRaw());
-        assertEquals(includeFilter, filter.getIncludeFilterRaw());
+        assertEquals("", filter.getExcludeFilter());
+        assertEquals(includeFilter, filter.getIncludeFilter());
         assertTrue(filter.shouldAutoDownload(item));
         assertFalse(filter.shouldAutoDownload(item2));
     }
@@ -56,8 +56,8 @@ public class FeedFilterTest {
 
         assertTrue(filter.excludeOnly());
         assertFalse(filter.includeOnly());
-        assertEquals(excludeFilter, filter.getExcludeFilterRaw());
-        assertEquals("", filter.getIncludeFilterRaw());
+        assertEquals(excludeFilter, filter.getExcludeFilter());
+        assertEquals("", filter.getIncludeFilter());
         assertFalse(filter.shouldAutoDownload(item));
         assertTrue(filter.shouldAutoDownload(item2));
     }
@@ -77,8 +77,8 @@ public class FeedFilterTest {
 
         assertFalse(filter.excludeOnly());
         assertTrue(filter.includeOnly());
-        assertEquals("", filter.getExcludeFilterRaw());
-        assertEquals(includeFilter, filter.getIncludeFilterRaw());
+        assertEquals("", filter.getExcludeFilter());
+        assertEquals(includeFilter, filter.getIncludeFilter());
         assertTrue(filter.shouldAutoDownload(item));
         assertFalse(filter.shouldAutoDownload(item2));
         assertTrue(filter.shouldAutoDownload(item3));
@@ -99,8 +99,8 @@ public class FeedFilterTest {
 
         assertTrue(filter.excludeOnly());
         assertFalse(filter.includeOnly());
-        assertEquals(excludeFilter, filter.getExcludeFilterRaw());
-        assertEquals("", filter.getIncludeFilterRaw());
+        assertEquals(excludeFilter, filter.getExcludeFilter());
+        assertEquals("", filter.getIncludeFilter());
         assertFalse(filter.shouldAutoDownload(item));
         assertTrue(filter.shouldAutoDownload(item2));
         assertFalse(filter.shouldAutoDownload(item3));

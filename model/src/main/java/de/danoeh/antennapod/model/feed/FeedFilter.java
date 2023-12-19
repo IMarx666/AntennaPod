@@ -102,20 +102,12 @@ public class FeedFilter implements Serializable {
         return false;
     }
 
-    public String getIncludeFilterRaw() {
+    public String getIncludeFilter() {
         return includeFilter;
     }
 
-    public String getExcludeFilterRaw() {
+    public String getExcludeFilter() {
         return excludeFilter;
-    }
-
-    public List<String> getIncludeFilter() {
-        return includeFilter == null ? new ArrayList<>() : parseTerms(includeFilter);
-    }
-
-    public List<String> getExcludeFilter() {
-        return excludeFilter == null ? new ArrayList<>() : parseTerms(excludeFilter);
     }
 
     public int getMinimalDurationFilter() {

@@ -20,23 +20,20 @@ import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
-import de.danoeh.antennapod.event.FeedUpdateRunningEvent;
-import de.danoeh.antennapod.event.MessageEvent;
-import de.danoeh.antennapod.model.feed.FeedItemFilter;
-import de.danoeh.antennapod.model.feed.SortOrder;
+import de.danoeh.antennapod.core.service.download.DownloadRequest;
+import de.danoeh.antennapod.core.service.download.DownloadService;
+import de.danoeh.antennapod.core.service.download.DownloadRequestCreator;
 import org.apache.commons.lang3.StringUtils;
 import org.greenrobot.eventbus.EventBus;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import de.danoeh.antennapod.core.R;
 import de.danoeh.antennapod.event.SyncServiceEvent;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.service.download.AntennapodHttpClient;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.storage.DBTasks;
@@ -44,7 +41,7 @@ import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.core.sync.queue.SynchronizationQueueStorage;
 import de.danoeh.antennapod.core.util.FeedItemUtil;
 import de.danoeh.antennapod.core.util.LongList;
-import de.danoeh.antennapod.net.common.UrlChecker;
+import de.danoeh.antennapod.core.util.URLChecker;
 import de.danoeh.antennapod.core.util.gui.NotificationUtils;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
@@ -152,11 +149,10 @@ public class SyncService extends Worker {
                 Log.d(TAG, "Skipping url: " + downloadUrl);
                 continue;
             }
-            if (!UrlChecker.containsUrl(localSubscriptions, downloadUrl) && !queuedRemovedFeeds.contains(downloadUrl)) {
-                Feed feed = new Feed(downloadUrl, null, "Unknown podcast");
-                feed.setItems(Collections.emptyList());
-                Feed newFeed = DBTasks.updateFeed(getApplicationContext(), feed, false);
-                FeedUpdateManager.runOnce(getApplicationContext(), newFeed);
+            if (!URLChecker.containsUrl(localSubscriptions, downloadUrl) && !queuedRemovedFeeds.contains(downloadUrl)) {
+                Feed feed = new Feed(downloadUrl, null);
+                DownloadRequest.Builder builder = DownloadRequestCreator.create(feed);
+                DownloadService.download(getApplicationContext(), false, builder.build());
             }
         }
 
@@ -194,13 +190,9 @@ public class SyncService extends Worker {
     private void waitForDownloadServiceCompleted() {
         EventBus.getDefault().postSticky(new SyncServiceEvent(R.string.sync_status_wait_for_downloads));
         try {
-            while (true) {
+            while (DownloadService.isRunning) {
                 //noinspection BusyWait
                 Thread.sleep(1000);
-                FeedUpdateRunningEvent event = EventBus.getDefault().getStickyEvent(FeedUpdateRunningEvent.class);
-                if (event == null || !event.isFeedUpdateRunning) {
-                    return;
-                }
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -220,8 +212,7 @@ public class SyncService extends Worker {
         List<EpisodeAction> queuedEpisodeActions = synchronizationQueueStorage.getQueuedEpisodeActions();
         if (lastSync == 0) {
             EventBus.getDefault().postSticky(new SyncServiceEvent(R.string.sync_status_upload_played));
-            List<FeedItem> readItems = DBReader.getEpisodes(0, Integer.MAX_VALUE,
-                    new FeedItemFilter(FeedItemFilter.PLAYED), SortOrder.DATE_NEW_OLD);
+            List<FeedItem> readItems = DBReader.getPlayedItems();
             Log.d(TAG, "First sync. Upload state for all " + readItems.size() + " played episodes");
             for (FeedItem item : readItems) {
                 FeedMedia media = item.getMedia();
@@ -275,6 +266,10 @@ public class SyncService extends Worker {
                 Log.i(TAG, "Feed item has no media: " + action);
                 continue;
             }
+            if (action.getAction() == EpisodeAction.NEW) {
+                DBWriter.markItemPlayed(feedItem, FeedItem.UNPLAYED, true);
+                continue;
+            }
             feedItem.getMedia().setPosition(action.getPosition() * 1000);
             if (FeedItemUtil.hasAlmostEnded(feedItem.getMedia())) {
                 Log.d(TAG, "Marking as played: " + action);
@@ -299,18 +294,13 @@ public class SyncService extends Worker {
     }
 
     private void updateErrorNotification(Exception exception) {
-        Log.d(TAG, "Posting sync error notification");
-        final String description = getApplicationContext().getString(R.string.gpodnetsync_error_descr)
-                + exception.getMessage();
-
         if (!UserPreferences.gpodnetNotificationsEnabled()) {
             Log.d(TAG, "Skipping sync error notification because of user setting");
             return;
         }
-        if (EventBus.getDefault().hasSubscriberForEvent(MessageEvent.class)) {
-            EventBus.getDefault().post(new MessageEvent(description));
-            return;
-        }
+        Log.d(TAG, "Posting sync error notification");
+        final String description = getApplicationContext().getString(R.string.gpodnetsync_error_descr)
+                + exception.getMessage();
 
         Intent intent = getApplicationContext().getPackageManager().getLaunchIntentForPackage(
                 getApplicationContext().getPackageName());
@@ -334,7 +324,7 @@ public class SyncService extends Worker {
 
     private static OneTimeWorkRequest.Builder getWorkRequest() {
         Constraints.Builder constraints = new Constraints.Builder();
-        if (UserPreferences.isAllowMobileSync()) {
+        if (UserPreferences.isAllowMobileFeedRefresh()) {
             constraints.setRequiredNetworkType(NetworkType.CONNECTED);
         } else {
             constraints.setRequiredNetworkType(NetworkType.UNMETERED);

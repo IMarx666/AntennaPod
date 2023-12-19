@@ -26,7 +26,6 @@ public class HandlerState {
      * URL of the feed, the value is the title
      */
     public final Map<String, String> alternateUrls;
-    public String redirectUrl = null;
     private final ArrayList<FeedItem> items;
     private FeedItem currentItem;
     private FeedFunding currentFunding;

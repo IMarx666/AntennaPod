@@ -1,14 +1,16 @@
 package de.danoeh.antennapod.preferences;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Typeface;
+import android.os.Build;
 import androidx.preference.SwitchPreferenceCompat;
 import androidx.preference.PreferenceViewHolder;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.widget.TextView;
 
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.ui.common.ThemeUtils;
 
 public class MasterSwitchPreference extends SwitchPreferenceCompat {
 
@@ -16,6 +18,7 @@ public class MasterSwitchPreference extends SwitchPreferenceCompat {
         super(context, attrs, defStyleAttr);
     }
 
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public MasterSwitchPreference(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
     }
@@ -33,7 +36,10 @@ public class MasterSwitchPreference extends SwitchPreferenceCompat {
     public void onBindViewHolder(PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
 
-        holder.itemView.setBackgroundColor(ThemeUtils.getColorFromAttr(getContext(), R.attr.colorSurfaceVariant));
+        TypedValue typedValue = new TypedValue();
+        getContext().getTheme().resolveAttribute(R.attr.master_switch_background, typedValue, true);
+        holder.itemView.setBackgroundColor(typedValue.data);
+
         TextView title = (TextView) holder.findViewById(android.R.id.title);
         if (title != null) {
             title.setTypeface(title.getTypeface(), Typeface.BOLD);

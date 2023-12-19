@@ -5,7 +5,7 @@ import android.graphics.PorterDuff.Mode;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
 import android.view.ContextThemeWrapper;
-import com.google.android.material.appbar.MaterialToolbar;
+import androidx.appcompat.widget.Toolbar;
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.appbar.CollapsingToolbarLayout;
 import de.danoeh.antennapod.R;
@@ -13,10 +13,10 @@ import de.danoeh.antennapod.R;
 public abstract class ToolbarIconTintManager implements AppBarLayout.OnOffsetChangedListener {
     private final Context context;
     private final CollapsingToolbarLayout collapsingToolbar;
-    private final MaterialToolbar toolbar;
+    private final Toolbar toolbar;
     private boolean isTinted = false;
 
-    public ToolbarIconTintManager(Context context, MaterialToolbar toolbar, CollapsingToolbarLayout collapsingToolbar) {
+    public ToolbarIconTintManager(Context context, Toolbar toolbar, CollapsingToolbarLayout collapsingToolbar) {
         this.context = context;
         this.collapsingToolbar = collapsingToolbar;
         this.toolbar = toolbar;

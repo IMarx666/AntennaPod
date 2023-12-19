@@ -2,8 +2,8 @@ package de.test.antennapod.ui;
 
 import android.content.Intent;
 import androidx.test.espresso.intent.rule.IntentsTestRule;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.model.feed.Feed;
@@ -73,7 +73,7 @@ public class FeedSettingsTest {
         clickPreference(R.string.auto_delete_label);
         onView(withText(R.string.cancel_label)).perform(click());
 
-        clickPreference(R.string.feed_volume_adapdation);
+        clickPreference(R.string.feed_volume_reduction);
         onView(withText(R.string.cancel_label)).perform(click());
     }
 }

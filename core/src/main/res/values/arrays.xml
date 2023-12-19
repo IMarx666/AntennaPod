@@ -2,7 +2,7 @@
 <resources>
 
     <string-array name="spnAutoDeleteItems">
-        <item>@string/global_default</item>
+        <item>@string/feed_auto_download_global</item>
         <item>@string/feed_auto_download_always</item>
         <item>@string/feed_auto_download_never</item>
     </string-array>
@@ -13,66 +13,16 @@
         <item>never</item>
     </string-array>
 
-    <string-array name="spnVolumeAdaptationItems">
-        <item>@string/feed_volume_reduction_heavy</item>
-        <item>@string/feed_volume_reduction_light</item>
+    <string-array name="spnVolumeReductionItems">
         <item>@string/feed_volume_reduction_off</item>
-        <item>@string/feed_volume_boost_light</item>
-        <item>@string/feed_volume_boost_medium</item>
-        <item>@string/feed_volume_boost_heavy</item>
+        <item>@string/feed_volume_reduction_light</item>
+        <item>@string/feed_volume_reduction_heavy</item>
     </string-array>
 
-    <string-array name="spnVolumeAdaptationValues">
-        <item>heavy</item>
-        <item>light</item>
+    <string-array name="spnVolumeReductionValues">
         <item>off</item>
-        <item>light_boost</item>
-        <item>medium_boost</item>
-        <item>heavy_boost</item>
-    </string-array>
-
-    <string-array name="feed_refresh_interval_entries">
-        <item>@string/feed_refresh_never</item>
-        <item>@string/feed_every_hour</item>
-        <item>@string/feed_every_2_hours</item>
-        <item>@string/feed_every_4_hours</item>
-        <item>@string/feed_every_8_hours</item>
-        <item>@string/feed_every_12_hours</item>
-        <item>@string/feed_every_24_hours</item>
-        <item>@string/feed_every_72_hours</item>
-    </string-array>
-
-    <string-array name="feed_refresh_interval_values">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-        <item>4</item>
-        <item>8</item>
-        <item>12</item>
-        <item>24</item>
-        <item>72</item>
-    </string-array>
-
-    <string-array name="globalNewEpisodesActionItems">
-        <item>@string/feed_new_episodes_action_add_to_inbox</item>
-        <item>@string/feed_new_episodes_action_nothing</item>
-    </string-array>
-
-    <string-array name="globalNewEpisodesActionValues">
-        <item>1</item>
-        <item>2</item>
-    </string-array>
-
-    <string-array name="feedNewEpisodesActionItems">
-        <item>@string/global_default</item>
-        <item>@string/feed_new_episodes_action_add_to_inbox</item>
-        <item>@string/feed_new_episodes_action_nothing</item>
-    </string-array>
-
-    <string-array name="feedNewEpisodesActionValues">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
+        <item>light</item>
+        <item>heavy</item>
     </string-array>
 
     <string-array name="smart_mark_as_played_values">
@@ -121,7 +71,6 @@
         <item>@string/pref_mobileUpdate_auto_download</item>
         <item>@string/pref_mobileUpdate_streaming</item>
         <item>@string/pref_mobileUpdate_images</item>
-        <item>@string/synchronization_pref</item>
     </string-array>
 
     <string-array name="mobile_update_values">
@@ -130,12 +79,10 @@
         <item>auto_download</item>
         <item>streaming</item>
         <item>images</item>
-        <item>sync</item>
     </string-array>
 
     <string-array name="mobile_update_default_value">
         <item>images</item>
-        <item>sync</item>
     </string-array>
 
     <string-array name="episode_cleanup_entries">
@@ -167,7 +114,6 @@
         <item>@string/enqueue_location_back</item>
         <item>@string/enqueue_location_front</item>
         <item>@string/enqueue_location_after_current</item>
-        <item>@string/enqueue_location_random</item>
     </string-array>
 
     <string-array name="enqueue_location_values">
@@ -175,7 +121,6 @@
         <item>BACK</item>
         <item>FRONT</item>
         <item>AFTER_CURRENTLY_PLAYING</item>
-        <item>RANDOM</item>
     </string-array>
 
     <string-array name="episode_cleanup_values">
@@ -190,8 +135,21 @@
         <item>-2</item>
     </string-array>
 
+    <string-array name="theme_options">
+        <item>@string/pref_theme_title_use_system</item>
+        <item>@string/pref_theme_title_light</item>
+        <item>@string/pref_theme_title_dark</item>
+        <item>@string/pref_theme_title_trueblack</item>
+    </string-array>
+
+    <string-array name="theme_values">
+        <item>system</item>
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
     <string-array name="nav_drawer_titles">
-        <item>@string/home_label</item>
         <item>@string/queue_label</item>
         <item>@string/inbox_label</item>
         <item>@string/episodes_label</item>
@@ -216,34 +174,72 @@
     </string-array>
 
     <string-array name="nav_drawer_feed_counter_options">
+        <item>@string/drawer_feed_counter_inbox_unplayed</item>
         <item>@string/drawer_feed_counter_inbox</item>
         <item>@string/drawer_feed_counter_unplayed</item>
         <item>@string/drawer_feed_counter_downloaded</item>
-        <item>@string/drawer_feed_counter_downloaded_unplayed</item>
         <item>@string/drawer_feed_counter_none</item>
     </string-array>
     <string-array name="nav_drawer_feed_counter_values">
+        <item>0</item>
         <item>1</item>
         <item>2</item>
         <item>4</item>
-        <item>5</item>
         <item>3</item>
     </string-array>
 
-    <string-array name="home_section_titles">
-        <item>@string/home_continue_title</item>
-        <item>@string/home_new_title</item>
-        <item>@string/home_surprise_title</item>
-        <item>@string/home_classics_title</item>
-        <item>@string/home_downloads_title</item>
+    <string-array name="media_player_options">
+        <item>@string/media_player_exoplayer_recommended</item>
+        <item>@string/media_player_builtin</item>
+        <item>@string/media_player_sonic</item>
     </string-array>
 
-    <string-array name="home_section_tags">
-        <item>QueueSection</item>
-        <item>InboxSection</item>
-        <item>EpisodesSurpriseSection</item>
-        <item>SubscriptionsSection</item>
-        <item>DownloadsSection</item>
+    <string-array name="media_player_values">
+        <item>exoplayer</item>
+        <item>builtin</item>
+        <item>sonic</item>
+    </string-array>
+
+    <!-- sort for podcast screen, not for queue -->
+    <string-array name="feed_episodes_sort_options">
+        <item>@string/sort_date_new_old</item>
+        <item>@string/sort_date_old_new</item>
+        <item>@string/sort_title_a_z</item>
+        <item>@string/sort_title_z_a</item>
+        <item>@string/sort_duration_short_long</item>
+        <item>@string/sort_duration_long_short</item>
+    </string-array>
+
+    <!-- sort for local feed screen -->
+    <string-array name="local_feed_episodes_sort_options">
+        <item>@string/sort_date_new_old</item>
+        <item>@string/sort_date_old_new</item>
+        <item>@string/sort_title_a_z</item>
+        <item>@string/sort_title_z_a</item>
+        <item>@string/sort_duration_short_long</item>
+        <item>@string/sort_duration_long_short</item>
+        <item>@string/sort_filename_a_z</item>
+        <item>@string/sort_filename_z_a</item>
+    </string-array>
+
+    <string-array name="feed_episodes_sort_values">
+        <item>DATE_NEW_OLD</item>
+        <item>DATE_OLD_NEW</item>
+        <item>EPISODE_TITLE_A_Z</item>
+        <item>EPISODE_TITLE_Z_A</item>
+        <item>DURATION_SHORT_LONG</item>
+        <item>DURATION_LONG_SHORT</item>
+    </string-array>
+
+    <string-array name="local_feed_episodes_sort_values">
+        <item>DATE_NEW_OLD</item>
+        <item>DATE_OLD_NEW</item>
+        <item>EPISODE_TITLE_A_Z</item>
+        <item>EPISODE_TITLE_Z_A</item>
+        <item>DURATION_SHORT_LONG</item>
+        <item>DURATION_LONG_SHORT</item>
+        <item>EPISODE_FILENAME_A_Z</item>
+        <item>EPISODE_FILENAME_Z_A</item>
     </string-array>
 
     <string-array name="compact_notification_buttons_options">
@@ -252,21 +248,33 @@
         <item>@string/skip_episode_label</item>
     </string-array>
 
-    <string-array name="default_page_values">
-        <item>HomeFragment</item>
-        <item>QueueFragment</item>
-        <item>NewEpisodesFragment</item>
-        <item>EpisodesFragment</item>
-        <item>SubscriptionFragment</item>
-        <item>remember</item>
+    <string-array name="back_button_behavior_options">
+        <item>@string/back_button_default</item>
+        <item>@string/back_button_go_to_page</item>
+        <item>@string/back_button_open_drawer</item>
+        <item>@string/back_button_double_tap</item>
+        <item>@string/back_button_show_prompt</item>
     </string-array>
 
-    <string-array name="default_page_titles">
-        <item>@string/home_label</item>
+    <string-array name="back_button_behavior_values">
+        <item>default</item>
+        <item>page</item>
+        <item>drawer</item>
+        <item>doubletap</item>
+        <item>prompt</item>
+    </string-array>
+
+    <string-array name="back_button_go_to_pages">
         <item>@string/queue_label</item>
         <item>@string/inbox_label</item>
         <item>@string/episodes_label</item>
         <item>@string/subscriptions_label</item>
-        <item>@string/remember_last_page</item>
+    </string-array>
+
+    <string-array name="back_button_go_to_pages_tags">
+        <item>QueueFragment</item>
+        <item>InboxFragment</item>
+        <item>EpisodesFragment</item>
+        <item>SubscriptionFragment</item>
     </string-array>
 </resources>

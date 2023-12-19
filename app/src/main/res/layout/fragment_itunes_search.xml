@@ -6,31 +6,40 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.google.android.material.appbar.AppBarLayout
-        android:id="@+id/appbar"
+    <LinearLayout
+        android:id="@+id/browsing"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:fitsSystemWindows="true"
-        android:elevation="0dp">
+        android:orientation="horizontal"
+        android:layout_alignParentTop="true">
 
-        <com.google.android.material.appbar.MaterialToolbar
+        <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minHeight="?attr/actionBarSize"
             android:theme="?attr/actionBarTheme"
-            app:title="@string/discover"
-            app:navigationContentDescription="@string/toolbar_back_button_content_description"
-            app:navigationIcon="?homeAsUpIndicator" />
+            app:navigationIcon="?homeAsUpIndicator"
+            app:title="@string/discover" />
 
-    </com.google.android.material.appbar.AppBarLayout>
+        <android.widget.Spinner
+            android:id="@+id/spinner_country"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="right|end"
+            android:gravity="right|end"
+            android:isScrollContainer="true"
+            android:minHeight="?attr/actionBarSize"
+            android:spinnerMode="dropdown"
+            android:textAlignment="textEnd" />
+
+    </LinearLayout>
 
     <GridView
         android:id="@+id/gridView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/appbar"
+        android:layout_below="@id/browsing"
         android:clipToPadding="false"
         android:columnWidth="400dp"
         android:gravity="center"
@@ -92,7 +101,7 @@
         android:text="@string/discover_powered_by_itunes"
         android:textSize="12sp"
         android:padding="4dp"
-        android:background="?android:attr/colorBackground"
+        android:background="?android:attr/windowBackground"
         android:layout_alignParentBottom="true"
         android:layout_alignParentRight="true"
         android:layout_alignParentEnd="true"

@@ -1,7 +1,6 @@
 package de.danoeh.antennapod.core.service.playback;
 
 import android.content.Context;
-import android.media.audiofx.LoudnessEnhancer;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Log;
@@ -37,14 +36,16 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
 import de.danoeh.antennapod.core.ClientConfig;
 import de.danoeh.antennapod.core.R;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.service.download.AntennapodHttpClient;
 import de.danoeh.antennapod.core.service.download.HttpCredentialEncoder;
 import de.danoeh.antennapod.core.util.NetworkUtils;
-import de.danoeh.antennapod.model.playback.Playable;
+import de.danoeh.antennapod.core.util.playback.IPlayer;
+import de.danoeh.antennapod.playback.base.PlaybackServiceMediaPlayer;
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
+import org.antennapod.audio.MediaPlayer;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -52,24 +53,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class ExoPlayerWrapper {
-    public static final int BUFFERING_STARTED = -1;
-    public static final int BUFFERING_ENDED = -2;
+public class ExoPlayerWrapper implements IPlayer {
     private static final String TAG = "ExoPlayerWrapper";
     public static final int ERROR_CODE_OFFSET = 1000;
-
     private final Context context;
     private final Disposable bufferingUpdateDisposable;
     private SimpleExoPlayer exoPlayer;
     private MediaSource mediaSource;
-    private Runnable audioSeekCompleteListener;
-    private Runnable audioCompletionListener;
+    private MediaPlayer.OnSeekCompleteListener audioSeekCompleteListener;
+    private MediaPlayer.OnCompletionListener audioCompletionListener;
     private Consumer<String> audioErrorListener;
-    private Consumer<Integer> bufferingUpdateListener;
+    private MediaPlayer.OnBufferingUpdateListener bufferingUpdateListener;
     private PlaybackParameters playbackParameters;
+    private MediaPlayer.OnInfoListener infoListener;
     private DefaultTrackSelector trackSelector;
-
-    private LoudnessEnhancer loudnessEnhancer;
 
     ExoPlayerWrapper(Context context) {
         this.context = context;
@@ -79,7 +76,7 @@ public class ExoPlayerWrapper {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(tickNumber -> {
                     if (bufferingUpdateListener != null) {
-                        bufferingUpdateListener.accept(exoPlayer.getBufferedPercentage());
+                        bufferingUpdateListener.onBufferingUpdate(null, exoPlayer.getBufferedPercentage());
                     }
                 });
     }
@@ -100,11 +97,11 @@ public class ExoPlayerWrapper {
             @Override
             public void onPlaybackStateChanged(@Player.State int playbackState) {
                 if (audioCompletionListener != null && playbackState == Player.STATE_ENDED) {
-                    audioCompletionListener.run();
-                } else if (bufferingUpdateListener != null && playbackState == Player.STATE_BUFFERING) {
-                    bufferingUpdateListener.accept(BUFFERING_STARTED);
-                } else if (bufferingUpdateListener != null) {
-                    bufferingUpdateListener.accept(BUFFERING_ENDED);
+                    audioCompletionListener.onCompletion(null);
+                } else if (infoListener != null && playbackState == Player.STATE_BUFFERING) {
+                    infoListener.onInfo(null, android.media.MediaPlayer.MEDIA_INFO_BUFFERING_START, 0);
+                } else if (infoListener != null) {
+                    infoListener.onInfo(null, android.media.MediaPlayer.MEDIA_INFO_BUFFERING_END, 0);
                 }
             }
 
@@ -133,47 +130,52 @@ public class ExoPlayerWrapper {
                                                 @NonNull Player.PositionInfo newPosition,
                                                 @Player.DiscontinuityReason int reason) {
                 if (audioSeekCompleteListener != null && reason == Player.DISCONTINUITY_REASON_SEEK) {
-                    audioSeekCompleteListener.run();
+                    audioSeekCompleteListener.onSeekComplete(null);
                 }
             }
-
-            @Override
-            public void onAudioSessionIdChanged(int audioSessionId) {
-                initLoudnessEnhancer(audioSessionId);
-            }
         });
-
-        initLoudnessEnhancer(exoPlayer.getAudioSessionId());
     }
 
+    @Override
+    public boolean canDownmix() {
+        return false;
+    }
+
+    @Override
     public int getCurrentPosition() {
         return (int) exoPlayer.getCurrentPosition();
     }
 
+    @Override
     public float getCurrentSpeedMultiplier() {
         return playbackParameters.speed;
     }
 
+    @Override
     public int getDuration() {
         if (exoPlayer.getDuration() == C.TIME_UNSET) {
-            return Playable.INVALID_TIME;
+            return PlaybackServiceMediaPlayer.INVALID_TIME;
         }
         return (int) exoPlayer.getDuration();
     }
 
+    @Override
     public boolean isPlaying() {
         return exoPlayer.getPlayWhenReady();
     }
 
+    @Override
     public void pause() {
         exoPlayer.pause();
     }
 
+    @Override
     public void prepare() throws IllegalStateException {
         exoPlayer.setMediaSource(mediaSource, false);
         exoPlayer.prepare();
     }
 
+    @Override
     public void release() {
         bufferingUpdateDisposable.dispose();
         if (exoPlayer != null) {
@@ -185,18 +187,21 @@ public class ExoPlayerWrapper {
         bufferingUpdateListener = null;
     }
 
+    @Override
     public void reset() {
         exoPlayer.release();
         createPlayer();
     }
 
+    @Override
     public void seekTo(int i) throws IllegalStateException {
         exoPlayer.seekTo(i);
         if (audioSeekCompleteListener != null) {
-            audioSeekCompleteListener.run();
+            audioSeekCompleteListener.onSeekComplete(null);
         }
     }
 
+    @Override
     public void setAudioStreamType(int i) {
         AudioAttributes a = exoPlayer.getAudioAttributes();
         AudioAttributes.Builder b = new AudioAttributes.Builder();
@@ -230,41 +235,51 @@ public class ExoPlayerWrapper {
         mediaSource = f.createMediaSource(mediaItem);
     }
 
+    @Override
     public void setDataSource(String s) throws IllegalArgumentException, IllegalStateException {
         setDataSource(s, null, null);
     }
 
+    @Override
     public void setDisplay(SurfaceHolder sh) {
         exoPlayer.setVideoSurfaceHolder(sh);
     }
 
+    @Override
     public void setPlaybackParams(float speed, boolean skipSilence) {
         playbackParameters = new PlaybackParameters(speed, playbackParameters.pitch);
         exoPlayer.setSkipSilenceEnabled(skipSilence);
         exoPlayer.setPlaybackParameters(playbackParameters);
     }
 
-    public void setVolume(float v, float v1) {
-        if (v > 1) {
-            exoPlayer.setVolume(1f);
-            loudnessEnhancer.setEnabled(true);
-            loudnessEnhancer.setTargetGain((int) (1000 * (v - 1)));
-        } else {
-            exoPlayer.setVolume(v);
-            loudnessEnhancer.setEnabled(false);
-        }
+    @Override
+    public void setDownmix(boolean b) {
+
     }
 
+    @Override
+    public void setVolume(float v, float v1) {
+        exoPlayer.setVolume(v);
+    }
+
+    @Override
+    public void setWakeMode(Context context, int i) {
+
+    }
+
+    @Override
     public void start() {
         exoPlayer.play();
         // Can't set params when paused - so always set it on start in case they changed
         exoPlayer.setPlaybackParameters(playbackParameters);
     }
 
+    @Override
     public void stop() {
         exoPlayer.stop();
     }
 
+    @Override
     public List<String> getAudioTracks() {
         List<String> trackNames = new ArrayList<>();
         TrackNameProvider trackNameProvider = new DefaultTrackNameProvider(context.getResources());
@@ -287,6 +302,7 @@ public class ExoPlayerWrapper {
         return formats;
     }
 
+    @Override
     public void setAudioTrack(int track) {
         MappingTrackSelector.MappedTrackInfo trackInfo = trackSelector.getCurrentMappedTrackInfo();
         if (trackInfo == null) {
@@ -308,6 +324,7 @@ public class ExoPlayerWrapper {
         return -1;
     }
 
+    @Override
     public int getSelectedAudioTrack() {
         TrackSelectionArray trackSelections = exoPlayer.getCurrentTrackSelections();
         List<Format> availableFormats = getFormats();
@@ -323,11 +340,11 @@ public class ExoPlayerWrapper {
         return -1;
     }
 
-    void setOnCompletionListener(Runnable audioCompletionListener) {
+    void setOnCompletionListener(MediaPlayer.OnCompletionListener audioCompletionListener) {
         this.audioCompletionListener = audioCompletionListener;
     }
 
-    void setOnSeekCompleteListener(Runnable audioSeekCompleteListener) {
+    void setOnSeekCompleteListener(MediaPlayer.OnSeekCompleteListener audioSeekCompleteListener) {
         this.audioSeekCompleteListener = audioSeekCompleteListener;
     }
 
@@ -349,21 +366,11 @@ public class ExoPlayerWrapper {
         return exoPlayer.getVideoFormat().height;
     }
 
-    void setOnBufferingUpdateListener(Consumer<Integer> bufferingUpdateListener) {
+    void setOnBufferingUpdateListener(MediaPlayer.OnBufferingUpdateListener bufferingUpdateListener) {
         this.bufferingUpdateListener = bufferingUpdateListener;
     }
 
-    private void initLoudnessEnhancer(int audioStreamId) {
-        LoudnessEnhancer newEnhancer = new LoudnessEnhancer(audioStreamId);
-        LoudnessEnhancer oldEnhancer = this.loudnessEnhancer;
-        if (oldEnhancer != null) {
-            newEnhancer.setEnabled(oldEnhancer.getEnabled());
-            if (oldEnhancer.getEnabled()) {
-                newEnhancer.setTargetGain((int) oldEnhancer.getTargetGain());
-            }
-            oldEnhancer.release();
-        }
-
-        this.loudnessEnhancer = newEnhancer;
+    public void setOnInfoListener(MediaPlayer.OnInfoListener infoListener) {
+        this.infoListener = infoListener;
     }
 }

@@ -3,7 +3,7 @@ package de.danoeh.antennapod.fragment.actions;
 import android.util.Log;
 
 import androidx.annotation.PluralsRes;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.util.Consumer;
 
 import com.google.android.material.snackbar.Snackbar;
@@ -36,8 +36,6 @@ public class FeedMultiSelectActionHandler {
     public void handleAction(int id) {
         if (id == R.id.remove_feed) {
             RemoveFeedDialog.show(activity, selectedItems);
-        } else if (id == R.id.notify_new_episodes) {
-            notifyNewEpisodesPrefHandler();
         } else if (id == R.id.keep_updated) {
             keepUpdatedPrefHandler();
         } else if (id == R.id.autodownload) {
@@ -53,21 +51,16 @@ public class FeedMultiSelectActionHandler {
         }
     }
 
-    private void notifyNewEpisodesPrefHandler() {
-        PreferenceSwitchDialog preferenceSwitchDialog = new PreferenceSwitchDialog(activity,
-                activity.getString(R.string.episode_notification),
-                activity.getString(R.string.episode_notification_summary));
-        preferenceSwitchDialog.setOnPreferenceChangedListener(enabled ->
-                saveFeedPreferences(feedPreferences -> feedPreferences.setShowEpisodeNotification(enabled)));
-        preferenceSwitchDialog.openDialog();
-    }
-
     private void autoDownloadPrefHandler() {
         PreferenceSwitchDialog preferenceSwitchDialog = new PreferenceSwitchDialog(activity,
                 activity.getString(R.string.auto_download_settings_label),
                 activity.getString(R.string.auto_download_label));
-        preferenceSwitchDialog.setOnPreferenceChangedListener(enabled ->
-                saveFeedPreferences(feedPreferences -> feedPreferences.setAutoDownload(enabled)));
+        preferenceSwitchDialog.setOnPreferenceChangedListener(new PreferenceSwitchDialog.OnPreferenceChangedListener() {
+            @Override
+            public void preferenceChanged(boolean enabled) {
+                saveFeedPreferences(feedPreferences -> feedPreferences.setAutoDownload(enabled));
+            }
+        });
         preferenceSwitchDialog.openDialog();
     }
 
@@ -82,7 +75,7 @@ public class FeedMultiSelectActionHandler {
             viewBinding.currentSpeedLabel.setAlpha(isChecked ? 0.4f : 1f);
         });
         viewBinding.seekBar.updateSpeed(1.0f);
-        new MaterialAlertDialogBuilder(activity)
+        new AlertDialog.Builder(activity)
                 .setTitle(R.string.playback_speed)
                 .setView(viewBinding.getRoot())
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
@@ -96,12 +89,28 @@ public class FeedMultiSelectActionHandler {
 
     private void autoDeleteEpisodesPrefHandler() {
         PreferenceListDialog preferenceListDialog = new PreferenceListDialog(activity,
-                activity.getString(R.string.auto_delete_label));
+                "Auto delete episodes");
         String[] items = activity.getResources().getStringArray(R.array.spnAutoDeleteItems);
+        String[] values = activity.getResources().getStringArray(R.array.spnAutoDeleteValues);
         preferenceListDialog.openDialog(items);
         preferenceListDialog.setOnPreferenceChangedListener(which -> {
-            FeedPreferences.AutoDeleteAction autoDeleteAction = FeedPreferences.AutoDeleteAction.fromCode(which);
-            saveFeedPreferences(feedPreferences -> feedPreferences.setAutoDeleteAction(autoDeleteAction));
+            FeedPreferences.AutoDeleteAction autoDeleteAction = null;
+            switch (values[which]) {
+                case "global":
+                    autoDeleteAction = FeedPreferences.AutoDeleteAction.GLOBAL;
+                    break;
+                case "always":
+                    autoDeleteAction = FeedPreferences.AutoDeleteAction.YES;
+                    break;
+                case "never":
+                    autoDeleteAction = FeedPreferences.AutoDeleteAction.NO;
+                    break;
+                default:
+            }
+            FeedPreferences.AutoDeleteAction finalAutoDeleteAction = autoDeleteAction;
+            saveFeedPreferences(feedPreferences -> {
+                feedPreferences.setAutoDeleteAction(finalAutoDeleteAction);
+            });
         });
     }
 
@@ -109,8 +118,11 @@ public class FeedMultiSelectActionHandler {
         PreferenceSwitchDialog preferenceSwitchDialog = new PreferenceSwitchDialog(activity,
                 activity.getString(R.string.kept_updated),
                 activity.getString(R.string.keep_updated_summary));
-        preferenceSwitchDialog.setOnPreferenceChangedListener(keepUpdated ->
-                saveFeedPreferences(feedPreferences -> feedPreferences.setKeepUpdated(keepUpdated)));
+        preferenceSwitchDialog.setOnPreferenceChangedListener(keepUpdated -> {
+            saveFeedPreferences(feedPreferences -> {
+                feedPreferences.setKeepUpdated(keepUpdated);
+            });
+        });
         preferenceSwitchDialog.openDialog();
     }
 

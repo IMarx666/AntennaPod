@@ -7,12 +7,6 @@
     android:orientation="vertical"
     android:clipToPadding="false">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:text="@string/synchronization_host_explanation" />
-
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/serverUrlTextInput"
         android:layout_width="match_parent"
@@ -24,7 +18,7 @@
             android:id="@+id/serverUrlText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/synchronization_host_label"
+            android:hint="@string/gpodnetauth_host"
             android:inputType="textNoSuggestions"
             android:lines="1"
             android:imeOptions="actionNext|flagNoFullscreen" />
@@ -57,13 +51,13 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:visibility="gone"
-        android:textColor="?attr/icon_red"
+        android:textColor="@color/download_failed_red"
         android:layout_marginBottom="16dp" />
 
     <Button
-        android:id="@+id/chooseHostButton"
+        android:id="@+id/loginButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/proceed_to_login_butLabel" />
+        android:text="@string/gpodnetauth_login_butLabel" />
 
 </LinearLayout>

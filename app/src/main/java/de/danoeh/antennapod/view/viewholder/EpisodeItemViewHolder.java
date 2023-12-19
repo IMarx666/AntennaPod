@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -14,26 +15,25 @@ import android.widget.TextView;
 import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.elevation.SurfaceColors;
 import com.joanzapata.iconify.Iconify;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.adapter.CoverLoader;
 import de.danoeh.antennapod.adapter.actionbutton.ItemActionButton;
-import de.danoeh.antennapod.core.util.PlaybackStatus;
-import de.danoeh.antennapod.core.util.download.MediaSizeLoader;
+import de.danoeh.antennapod.core.service.download.DownloadRequest;
+import de.danoeh.antennapod.core.service.download.DownloadService;
 import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
 import de.danoeh.antennapod.core.util.DateFormatter;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.playback.MediaType;
 import de.danoeh.antennapod.core.feed.util.ImageResourceUtils;
-import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
+import de.danoeh.antennapod.core.service.playback.PlaybackService;
 import de.danoeh.antennapod.core.util.Converter;
+import de.danoeh.antennapod.core.util.FeedItemUtil;
 import de.danoeh.antennapod.core.util.NetworkUtils;
-import de.danoeh.antennapod.model.playback.Playable;
 import de.danoeh.antennapod.ui.common.CircularProgressBar;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
 
@@ -63,6 +63,7 @@ public class EpisodeItemViewHolder extends RecyclerView.ViewHolder {
     private final TextView separatorIcons;
     private final View leftPadding;
     public final CardView coverHolder;
+    public final CheckBox selectCheckBox;
 
     private final MainActivity activity;
     private FeedItem item;
@@ -94,17 +95,14 @@ public class EpisodeItemViewHolder extends RecyclerView.ViewHolder {
         coverHolder = itemView.findViewById(R.id.coverHolder);
         leftPadding = itemView.findViewById(R.id.left_padding);
         itemView.setTag(this);
+        selectCheckBox = itemView.findViewById(R.id.selectCheckBox);
     }
 
     public void bind(FeedItem item) {
         this.item = item;
         placeholder.setText(item.getFeed().getTitle());
         title.setText(item.getTitle());
-        if (item.isPlayed()) {
-            leftPadding.setContentDescription(item.getTitle() + ". " + activity.getString(R.string.is_played));
-        } else {
-            leftPadding.setContentDescription(item.getTitle());
-        }
+        leftPadding.setContentDescription(item.getTitle());
         pubDate.setText(DateFormatter.formatAbbrev(activity, item.getPubDate()));
         pubDate.setContentDescription(DateFormatter.formatForAccessibility(item.getPubDate()));
         isInbox.setVisibility(item.isNew() ? View.VISIBLE : View.GONE);
@@ -120,7 +118,6 @@ public class EpisodeItemViewHolder extends RecyclerView.ViewHolder {
             bind(item.getMedia());
         } else {
             secondaryActionProgress.setPercentage(0, item);
-            secondaryActionProgress.setIndeterminate(false);
             isVideo.setVisibility(View.GONE);
             progressBar.setVisibility(View.GONE);
             duration.setVisibility(View.GONE);
@@ -142,30 +139,26 @@ public class EpisodeItemViewHolder extends RecyclerView.ViewHolder {
         isVideo.setVisibility(media.getMediaType() == MediaType.VIDEO ? View.VISIBLE : View.GONE);
         duration.setVisibility(media.getDuration() > 0 ? View.VISIBLE : View.GONE);
 
-        if (PlaybackStatus.isCurrentlyPlaying(media)) {
-            float density = activity.getResources().getDisplayMetrics().density;
-            itemView.setBackgroundColor(SurfaceColors.getColorForElevation(activity, 8 * density));
+        if (FeedItemUtil.isCurrentlyPlaying(media)) {
+            itemView.setBackgroundColor(ThemeUtils.getColorFromAttr(activity, R.attr.currently_playing_background));
         } else {
             itemView.setBackgroundResource(ThemeUtils.getDrawableFromAttr(activity, R.attr.selectableItemBackground));
         }
 
-        if (DownloadServiceInterface.get().isDownloadingEpisode(media.getDownload_url())) {
-            float percent = 0.01f * DownloadServiceInterface.get().getProgress(media.getDownload_url());
+        if (DownloadService.isDownloadingFile(media.getDownload_url())) {
+            final DownloadRequest downloadRequest = DownloadService.findRequest(media.getDownload_url());
+            float percent = 0.01f * downloadRequest.getProgressPercent();
             secondaryActionProgress.setPercentage(Math.max(percent, 0.01f), item);
-            secondaryActionProgress.setIndeterminate(
-                    DownloadServiceInterface.get().isEpisodeQueued(media.getDownload_url()));
         } else if (media.isDownloaded()) {
             secondaryActionProgress.setPercentage(1, item); // Do not animate 100% -> 0%
-            secondaryActionProgress.setIndeterminate(false);
         } else {
             secondaryActionProgress.setPercentage(0, item); // Animate X% -> 0%
-            secondaryActionProgress.setIndeterminate(false);
         }
 
         duration.setText(Converter.getDurationStringLong(media.getDuration()));
         duration.setContentDescription(activity.getString(R.string.chapter_duration,
                 Converter.getDurationStringLocalized(activity, media.getDuration())));
-        if (PlaybackStatus.isPlaying(item.getMedia()) || item.isInProgress()) {
+        if (FeedItemUtil.isPlaying(item.getMedia()) || item.isInProgress()) {
             int progress = (int) (100.0 * media.getPosition() / media.getDuration());
             int remainingTime = Math.max(media.getDuration() - media.getPosition(), 0);
             progressBar.setProgress(progress);
@@ -189,7 +182,7 @@ public class EpisodeItemViewHolder extends RecyclerView.ViewHolder {
         } else if (NetworkUtils.isEpisodeHeadDownloadAllowed() && !media.checkedOnSizeButUnknown()) {
             size.setText("{fa-spinner}");
             Iconify.addIcons(size);
-            MediaSizeLoader.getFeedMediaSizeObservable(media).subscribe(
+            NetworkUtils.getFeedMediaSizeObservable(media).subscribe(
                     sizeValue -> {
                         if (sizeValue > 0) {
                             size.setText(Formatter.formatShortFileSize(activity, sizeValue));
@@ -205,44 +198,12 @@ public class EpisodeItemViewHolder extends RecyclerView.ViewHolder {
         }
     }
 
-    public void bindDummy() {
-        item = new FeedItem();
-        container.setAlpha(0.1f);
-        secondaryActionIcon.setImageDrawable(null);
-        isInbox.setVisibility(View.VISIBLE);
-        isVideo.setVisibility(View.GONE);
-        isFavorite.setVisibility(View.GONE);
-        isInQueue.setVisibility(View.GONE);
-        title.setText("███████");
-        pubDate.setText("████");
-        duration.setText("████");
-        secondaryActionProgress.setPercentage(0, null);
-        secondaryActionProgress.setIndeterminate(false);
-        progressBar.setVisibility(View.GONE);
-        position.setVisibility(View.GONE);
-        dragHandle.setVisibility(View.GONE);
-        size.setText("");
-        itemView.setBackgroundResource(ThemeUtils.getDrawableFromAttr(activity, R.attr.selectableItemBackground));
-        placeholder.setText("");
-        if (coverHolder.getVisibility() == View.VISIBLE) {
-            new CoverLoader(activity)
-                    .withResource(R.color.medium_gray)
-                    .withPlaceholderView(placeholder)
-                    .withCoverView(cover)
-                    .load();
-        }
-    }
-
     private void updateDuration(PlaybackPositionEvent event) {
-        if (getFeedItem().getMedia() != null) {
-            getFeedItem().getMedia().setPosition(event.getPosition());
-            getFeedItem().getMedia().setDuration(event.getDuration());
-        }
         int currentPosition = event.getPosition();
         int timeDuration = event.getDuration();
         int remainingTime = Math.max(timeDuration - currentPosition, 0);
         Log.d(TAG, "currentPosition " + Converter.getDurationStringLong(currentPosition));
-        if (currentPosition == Playable.INVALID_TIME || timeDuration == Playable.INVALID_TIME) {
+        if (currentPosition == PlaybackService.INVALID_TIME || timeDuration == PlaybackService.INVALID_TIME) {
             Log.w(TAG, "Could not react to position observer update because of invalid time");
             return;
         }
@@ -258,7 +219,7 @@ public class EpisodeItemViewHolder extends RecyclerView.ViewHolder {
     }
 
     public boolean isCurrentlyPlayingItem() {
-        return item.getMedia() != null && PlaybackStatus.isCurrentlyPlaying(item.getMedia());
+        return item.getMedia() != null && FeedItemUtil.isCurrentlyPlaying(item.getMedia());
     }
 
     public void notifyPlaybackPositionUpdated(PlaybackPositionEvent event) {

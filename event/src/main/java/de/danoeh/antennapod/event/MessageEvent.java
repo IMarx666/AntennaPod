@@ -1,27 +1,21 @@
 package de.danoeh.antennapod.event;
 
-import android.content.Context;
 import androidx.annotation.Nullable;
-
-import androidx.core.util.Consumer;
 
 public class MessageEvent {
 
     public final String message;
 
     @Nullable
-    public final Consumer<Context> action;
-
-    @Nullable
-    public final String actionText;
+    public final Runnable action;
 
     public MessageEvent(String message) {
-        this(message, null, null);
+        this(message, null);
     }
 
-    public MessageEvent(String message, Consumer<Context> action, String actionText) {
+    public MessageEvent(String message, Runnable action) {
         this.message = message;
         this.action = action;
-        this.actionText = actionText;
     }
+
 }

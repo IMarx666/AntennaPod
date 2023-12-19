@@ -15,7 +15,7 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.snackbar.Snackbar;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.event.playback.SpeedChangedEvent;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.util.playback.PlaybackController;
 import de.danoeh.antennapod.view.ItemOffsetDecoration;
 import de.danoeh.antennapod.view.PlaybackSpeedSeekBar;
@@ -23,6 +23,7 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,6 +32,7 @@ import java.util.Locale;
 
 public class VariableSpeedDialog extends BottomSheetDialogFragment {
     private SpeedSelectionAdapter adapter;
+    private final DecimalFormat speedFormat;
     private PlaybackController controller;
     private final List<Float> selectedSpeeds;
     private PlaybackSpeedSeekBar speedSeekBar;
@@ -39,6 +41,7 @@ public class VariableSpeedDialog extends BottomSheetDialogFragment {
     public VariableSpeedDialog() {
         DecimalFormatSymbols format = new DecimalFormatSymbols(Locale.US);
         format.setDecimalSeparator('.');
+        speedFormat = new DecimalFormat("0.00", format);
         selectedSpeeds = new ArrayList<>(UserPreferences.getPlaybackSpeedArray());
     }
 
@@ -53,7 +56,6 @@ public class VariableSpeedDialog extends BottomSheetDialogFragment {
         };
         controller.init();
         EventBus.getDefault().register(this);
-        updateSpeed(new SpeedChangedEvent(controller.getCurrentPlaybackSpeedMultiplier()));
     }
 
     @Override
@@ -67,7 +69,7 @@ public class VariableSpeedDialog extends BottomSheetDialogFragment {
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void updateSpeed(SpeedChangedEvent event) {
         speedSeekBar.updateSpeed(event.getNewSpeed());
-        addCurrentSpeedChip.setText(String.format(Locale.getDefault(), "%1$.2f", event.getNewSpeed()));
+        addCurrentSpeedChip.setText(speedFormat.format(event.getNewSpeed()));
     }
 
     @Nullable
@@ -92,13 +94,12 @@ public class VariableSpeedDialog extends BottomSheetDialogFragment {
         addCurrentSpeedChip.setCloseIconVisible(true);
         addCurrentSpeedChip.setCloseIconResource(R.drawable.ic_add);
         addCurrentSpeedChip.setOnCloseIconClickListener(v -> addCurrentSpeed());
-        addCurrentSpeedChip.setCloseIconContentDescription(getString(R.string.add_preset));
         addCurrentSpeedChip.setOnClickListener(v -> addCurrentSpeed());
         return root;
     }
 
     private void addCurrentSpeed() {
-        float newSpeed = speedSeekBar.getCurrentSpeed();
+        float newSpeed = controller.getCurrentPlaybackSpeedMultiplier();
         if (selectedSpeeds.contains(newSpeed)) {
             Snackbar.make(addCurrentSpeedChip,
                     getString(R.string.preset_already_exists, newSpeed), Snackbar.LENGTH_LONG).show();
@@ -124,7 +125,7 @@ public class VariableSpeedDialog extends BottomSheetDialogFragment {
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             float speed = selectedSpeeds.get(position);
 
-            holder.chip.setText(String.format(Locale.getDefault(), "%1$.2f", speed));
+            holder.chip.setText(speedFormat.format(speed));
             holder.chip.setOnLongClickListener(v -> {
                 selectedSpeeds.remove(speed);
                 UserPreferences.setPlaybackSpeedArray(selectedSpeeds);

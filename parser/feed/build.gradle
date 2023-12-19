@@ -4,7 +4,9 @@ plugins {
 apply from: "../../common.gradle"
 
 android {
-    namespace "de.danoeh.antennapod.parser.feed"
+    lintOptions {
+        disable "TrustAllX509TrustManager"
+    }
 }
 
 dependencies {

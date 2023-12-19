@@ -1,6 +1,6 @@
 package de.danoeh.antennapod.core.util;
 
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 
 public class TimeSpeedConverter {
     private final float speed;

@@ -46,7 +46,7 @@ public class ID3Reader {
     }
 
     protected void readFrame(@NonNull FrameHeader frameHeader) throws IOException, ID3ReaderException {
-        Log.d(TAG, "Skipping frame: " + frameHeader.getId() + ", size: " + frameHeader.getSize());
+        Log.d(TAG, "Skipping frame: " + frameHeader.toString());
         skipBytes(frameHeader.getSize());
     }
 
@@ -106,7 +106,7 @@ public class ID3Reader {
 
     @NonNull
     FrameHeader readFrameHeader() throws IOException {
-        String id = readPlainBytesToString(FRAME_ID_LENGTH);
+        String id = readIsoStringFixed(FRAME_ID_LENGTH);
         int size = readInt();
         if (tagHeader != null && tagHeader.getVersion() >= 0x0400) {
             size = unsynchsafe(size);
@@ -136,14 +136,15 @@ public class ID3Reader {
         return readEncodedString(encoding, max - 1);
     }
 
-    protected String readPlainBytesToString(int length) throws IOException {
-        StringBuilder stringBuilder = new StringBuilder();
+    @SuppressWarnings("CharsetObjectCanBeUsed")
+    protected String readIsoStringFixed(int length) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         int bytesRead = 0;
         while (bytesRead < length) {
-            stringBuilder.append((char) readByte());
+            bytes.write(readByte());
             bytesRead++;
         }
-        return stringBuilder.toString();
+        return Charset.forName("ISO-8859-1").newDecoder().decode(ByteBuffer.wrap(bytes.toByteArray())).toString();
     }
 
     protected String readIsoStringNullTerminated(int max) throws IOException {

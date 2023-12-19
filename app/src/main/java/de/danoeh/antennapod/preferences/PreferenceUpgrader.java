@@ -3,20 +3,14 @@ package de.danoeh.antennapod.preferences;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.KeyEvent;
-import androidx.core.app.NotificationManagerCompat;
 import androidx.preference.PreferenceManager;
 
-import org.apache.commons.lang3.StringUtils;
-
-import java.util.concurrent.TimeUnit;
-
 import de.danoeh.antennapod.BuildConfig;
-import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.core.preferences.SleepTimerPreferences;
 import de.danoeh.antennapod.error.CrashReportWriter;
-import de.danoeh.antennapod.fragment.AllEpisodesFragment;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
-import de.danoeh.antennapod.storage.preferences.UserPreferences.EnqueueLocation;
+import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences.EnqueueLocation;
+import de.danoeh.antennapod.core.util.download.AutoUpdateManager;
 import de.danoeh.antennapod.fragment.QueueFragment;
 import de.danoeh.antennapod.fragment.swipeactions.SwipeAction;
 import de.danoeh.antennapod.fragment.swipeactions.SwipeActions;
@@ -34,6 +28,7 @@ public class PreferenceUpgrader {
         int newVersion = BuildConfig.VERSION_CODE;
 
         if (oldVersion != newVersion) {
+            AutoUpdateManager.restartUpdateAlarm(context);
             CrashReportWriter.getFile().delete();
 
             upgrade(oldVersion, context);
@@ -59,6 +54,9 @@ public class PreferenceUpgrader {
             }
         }
         if (oldVersion < 1070300) {
+            prefs.edit().putString(UserPreferences.PREF_MEDIA_PLAYER,
+                    UserPreferences.PREF_MEDIA_PLAYER_EXOPLAYER).apply();
+
             if (prefs.getBoolean("prefEnableAutoDownloadOnMobile", false)) {
                 UserPreferences.setAllowMobileAutoDownload(true);
             }
@@ -77,8 +75,8 @@ public class PreferenceUpgrader {
             }
         }
         if (oldVersion < 1070400) {
-            UserPreferences.ThemePreference theme = UserPreferences.getTheme();
-            if (theme == UserPreferences.ThemePreference.LIGHT) {
+            int theme = UserPreferences.getTheme();
+            if (theme == R.style.Theme_AntennaPod_Light) {
                 prefs.edit().putString(UserPreferences.PREF_THEME, "system").apply();
             }
 
@@ -110,61 +108,6 @@ public class PreferenceUpgrader {
         }
         if (oldVersion < 2050000) {
             prefs.edit().putBoolean(UserPreferences.PREF_PAUSE_PLAYBACK_FOR_FOCUS_LOSS, true).apply();
-        }
-        if (oldVersion < 2080000) {
-            // Migrate drawer feed counter setting to reflect removal of
-            // "unplayed and in inbox" (0), by changing it to "unplayed" (2)
-            String feedCounterSetting = prefs.getString(UserPreferences.PREF_DRAWER_FEED_COUNTER, "1");
-            if (feedCounterSetting.equals("0")) {
-                prefs.edit().putString(UserPreferences.PREF_DRAWER_FEED_COUNTER, "2").apply();
-            }
-
-            SharedPreferences sleepTimerPreferences =
-                    context.getSharedPreferences(SleepTimerPreferences.PREF_NAME, Context.MODE_PRIVATE);
-            TimeUnit[] timeUnits = { TimeUnit.SECONDS, TimeUnit.MINUTES, TimeUnit.HOURS };
-            long value = Long.parseLong(SleepTimerPreferences.lastTimerValue());
-            TimeUnit unit = timeUnits[sleepTimerPreferences.getInt("LastTimeUnit", 1)];
-            SleepTimerPreferences.setLastTimer(String.valueOf(unit.toMinutes(value)));
-
-            if (prefs.getString(UserPreferences.PREF_EPISODE_CACHE_SIZE, "20")
-                    .equals(context.getString(R.string.pref_episode_cache_unlimited))) {
-                prefs.edit().putString(UserPreferences.PREF_EPISODE_CACHE_SIZE,
-                        "" + UserPreferences.EPISODE_CACHE_SIZE_UNLIMITED).apply();
-            }
-        }
-        if (oldVersion < 3000007) {
-            if (prefs.getString("prefBackButtonBehavior", "").equals("drawer")) {
-                prefs.edit().putBoolean(UserPreferences.PREF_BACK_OPENS_DRAWER, true).apply();
-            }
-        }
-        if (oldVersion < 3010000) {
-            if (prefs.getString(UserPreferences.PREF_THEME, "system").equals("2")) {
-                prefs.edit()
-                        .putString(UserPreferences.PREF_THEME, "1")
-                        .putBoolean(UserPreferences.PREF_THEME_BLACK, true)
-                        .apply();
-            }
-            UserPreferences.setAllowMobileSync(true);
-            if (prefs.getString(UserPreferences.PREF_UPDATE_INTERVAL, ":").contains(":")) { // Unset or "time of day"
-                prefs.edit().putString(UserPreferences.PREF_UPDATE_INTERVAL, "12").apply();
-            }
-        }
-        if (oldVersion < 3020000) {
-            NotificationManagerCompat.from(context).deleteNotificationChannel("auto_download");
-        }
-
-        if (oldVersion < 3030000) {
-            SharedPreferences allEpisodesPreferences =
-                    context.getSharedPreferences(AllEpisodesFragment.PREF_NAME, Context.MODE_PRIVATE);
-            String oldEpisodeSort = allEpisodesPreferences.getString(UserPreferences.PREF_SORT_ALL_EPISODES, "");
-            if (!StringUtils.isAllEmpty(oldEpisodeSort)) {
-                prefs.edit().putString(UserPreferences.PREF_SORT_ALL_EPISODES, oldEpisodeSort).apply();
-            }
-
-            String oldEpisodeFilter = allEpisodesPreferences.getString("filter", "");
-            if (!StringUtils.isAllEmpty(oldEpisodeFilter)) {
-                prefs.edit().putString(UserPreferences.PREF_FILTER_ALL_EPISODES, oldEpisodeFilter).apply();
-            }
         }
     }
 }

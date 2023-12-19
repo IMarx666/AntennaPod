@@ -20,20 +20,21 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.SimpleItemAnimator;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.snackbar.Snackbar;
 import com.leinardi.android.speeddial.SpeedDialView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.adapter.EpisodeItemListAdapter;
 import de.danoeh.antennapod.core.dialog.ConfirmationDialog;
+import de.danoeh.antennapod.core.event.DownloadEvent;
+import de.danoeh.antennapod.core.event.DownloaderUpdate;
 import de.danoeh.antennapod.core.menuhandler.MenuItemUtils;
+import de.danoeh.antennapod.core.service.download.DownloadService;
+import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.util.FeedItemUtil;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
-import de.danoeh.antennapod.event.EpisodeDownloadEvent;
+import de.danoeh.antennapod.core.util.download.AutoUpdateManager;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
-import de.danoeh.antennapod.event.FeedUpdateRunningEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.event.UnreadItemsUpdateEvent;
 import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
@@ -44,7 +45,6 @@ import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.view.EmptyViewHandler;
 import de.danoeh.antennapod.view.EpisodeItemListRecyclerView;
-import de.danoeh.antennapod.view.LiftOnScrollListener;
 import de.danoeh.antennapod.view.viewholder.EpisodeItemViewHolder;
 import io.reactivex.Completable;
 import io.reactivex.Observable;
@@ -56,7 +56,6 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -69,16 +68,17 @@ public abstract class EpisodesListFragment extends Fragment
     protected static final int EPISODES_PER_PAGE = 150;
     protected int page = 1;
     protected boolean isLoadingMore = false;
-    protected boolean hasMoreItems = false;
+    protected boolean hasMoreItems = true;
     private boolean displayUpArrow;
 
     EpisodeItemListRecyclerView recyclerView;
     EpisodeItemListAdapter listAdapter;
+    ProgressBar progLoading;
+    View loadingMoreView;
     EmptyViewHandler emptyView;
     SpeedDialView speedDialView;
-    MaterialToolbar toolbar;
+    Toolbar toolbar;
     SwipeActions swipeActions;
-    private ProgressBar progressBar;
 
     @NonNull
     List<FeedItem> episodes = new ArrayList<>();
@@ -122,7 +122,7 @@ public abstract class EpisodesListFragment extends Fragment
         }
         final int itemId = item.getItemId();
         if (itemId == R.id.refresh_item) {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             return true;
         } else if (itemId == R.id.action_search) {
             ((MainActivity) getActivity()).loadChildFragment(SearchFragment.newInstance());
@@ -167,10 +167,9 @@ public abstract class EpisodesListFragment extends Fragment
         }
         ((MainActivity) getActivity()).setupToolbarToggle(toolbar, displayUpArrow);
 
-        recyclerView = root.findViewById(R.id.recyclerView);
+        recyclerView = root.findViewById(android.R.id.list);
         recyclerView.setRecycledViewPool(((MainActivity) getActivity()).getRecycledViewPool());
         setupLoadMoreScrollListener();
-        recyclerView.addOnScrollListener(new LiftOnScrollListener(root.findViewById(R.id.appbar)));
 
         swipeActions = new SwipeActions(this, getFragmentTag()).attachTo(recyclerView);
         swipeActions.setFilter(getFilter());
@@ -183,32 +182,22 @@ public abstract class EpisodesListFragment extends Fragment
         SwipeRefreshLayout swipeRefreshLayout = root.findViewById(R.id.swipeRefresh);
         swipeRefreshLayout.setDistanceToTriggerSync(getResources().getInteger(R.integer.swipe_refresh_distance));
         swipeRefreshLayout.setOnRefreshListener(() -> {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             new Handler(Looper.getMainLooper()).postDelayed(() -> swipeRefreshLayout.setRefreshing(false),
                     getResources().getInteger(R.integer.swipe_to_refresh_duration_in_ms));
         });
 
-        listAdapter = new EpisodeItemListAdapter((MainActivity) getActivity()) {
-            @Override
-            public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
-                super.onCreateContextMenu(menu, v, menuInfo);
-                if (!inActionMode()) {
-                    menu.findItem(R.id.multi_select).setVisible(true);
-                }
-                MenuItemUtils.setOnClickListeners(menu, EpisodesListFragment.this::onContextItemSelected);
-            }
-        };
-        listAdapter.setOnSelectModeListener(this);
-        recyclerView.setAdapter(listAdapter);
-        progressBar = root.findViewById(R.id.progressBar);
-        progressBar.setVisibility(View.VISIBLE);
+        progLoading = root.findViewById(R.id.progLoading);
+        progLoading.setVisibility(View.VISIBLE);
+        loadingMoreView = root.findViewById(R.id.loadingMore);
 
         emptyView = new EmptyViewHandler(getContext());
         emptyView.attachToRecyclerView(recyclerView);
         emptyView.setIcon(R.drawable.ic_feed);
         emptyView.setTitle(R.string.no_all_episodes_head_label);
         emptyView.setMessage(R.string.no_all_episodes_label);
-        emptyView.updateAdapter(listAdapter);
+
+        createRecycleAdapter(recyclerView, emptyView);
         emptyView.hide();
 
         speedDialView = root.findViewById(R.id.fabSD);
@@ -297,36 +286,68 @@ public abstract class EpisodesListFragment extends Fragment
             disposable.dispose();
         }
         isLoadingMore = true;
-        listAdapter.setDummyViews(1);
-        listAdapter.notifyItemInserted(listAdapter.getItemCount() - 1);
+        loadingMoreView.setVisibility(View.VISIBLE);
         disposable = Observable.fromCallable(() -> loadMoreData(page))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                        data -> {
-                            if (data.size() < EPISODES_PER_PAGE) {
-                                hasMoreItems = false;
-                            }
-                            episodes.addAll(data);
-                            listAdapter.setDummyViews(0);
-                            listAdapter.updateItems(episodes);
-                            if (listAdapter.shouldSelectLazyLoadedItems()) {
-                                listAdapter.setSelected(episodes.size() - data.size(), episodes.size(), true);
-                            }
-                        }, error -> {
-                            listAdapter.setDummyViews(0);
-                            listAdapter.updateItems(Collections.emptyList());
-                            Log.e(TAG, Log.getStackTraceString(error));
-                        }, () -> {
-                            // Make sure to not always load 2 pages at once
-                            recyclerView.post(() -> isLoadingMore = false);
-                        });
+                .subscribe(data -> {
+                    if (data.size() < EPISODES_PER_PAGE) {
+                        hasMoreItems = false;
+                    }
+                    episodes.addAll(data);
+                    updateAdapterWithNewItems();
+                    if (listAdapter.shouldSelectLazyLoadedItems()) {
+                        listAdapter.setSelected(episodes.size() - data.size(), episodes.size(), true);
+                    }
+                }, error -> Log.e(TAG, Log.getStackTraceString(error)),
+                    () -> {
+                        recyclerView.post(() -> isLoadingMore = false); // Make sure to not always load 2 pages at once
+                        progLoading.setVisibility(View.GONE);
+                        loadingMoreView.setVisibility(View.GONE);
+                    });
+    }
+
+    protected void updateAdapterWithNewItems() {
+        boolean restoreScrollPosition = listAdapter.getItemCount() == 0;
+        if (episodes.size() == 0) {
+            createRecycleAdapter(recyclerView, emptyView);
+        } else {
+            listAdapter.updateItems(episodes);
+        }
+        if (restoreScrollPosition) {
+            recyclerView.restoreScrollPosition(getPrefName());
+        }
+    }
+
+    /**
+     * Currently, we need to recreate the list adapter in order to be able to undo last item via the
+     * snackbar. See #3084 for details.
+     */
+    private void createRecycleAdapter(RecyclerView recyclerView, EmptyViewHandler emptyViewHandler) {
+        MainActivity mainActivity = (MainActivity) getActivity();
+        listAdapter = new EpisodeItemListAdapter(mainActivity) {
+            @Override
+            public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+                super.onCreateContextMenu(menu, v, menuInfo);
+                if (!inActionMode()) {
+                    menu.findItem(R.id.multi_select).setVisible(true);
+                }
+                MenuItemUtils.setOnClickListeners(menu, EpisodesListFragment.this::onContextItemSelected);
+            }
+        };
+        listAdapter.setOnSelectModeListener(this);
+        listAdapter.updateItems(episodes);
+        recyclerView.setAdapter(listAdapter);
+        emptyViewHandler.updateAdapter(listAdapter);
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        listAdapter.endSelectMode();
+        if (listAdapter != null) {
+            listAdapter.endSelectMode();
+        }
+        listAdapter = null;
     }
 
     @Override
@@ -359,11 +380,13 @@ public abstract class EpisodesListFragment extends Fragment
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onEventMainThread(PlaybackPositionEvent event) {
-        for (int i = 0; i < listAdapter.getItemCount(); i++) {
-            EpisodeItemViewHolder holder = (EpisodeItemViewHolder) recyclerView.findViewHolderForAdapterPosition(i);
-            if (holder != null && holder.isCurrentlyPlayingItem()) {
-                holder.notifyPlaybackPositionUpdated(event);
-                break;
+        if (listAdapter != null) {
+            for (int i = 0; i < listAdapter.getItemCount(); i++) {
+                EpisodeItemViewHolder holder = (EpisodeItemViewHolder) recyclerView.findViewHolderForAdapterPosition(i);
+                if (holder != null && holder.isCurrentlyPlayingItem()) {
+                    holder.notifyPlaybackPositionUpdated(event);
+                    break;
+                }
             }
         }
     }
@@ -386,11 +409,16 @@ public abstract class EpisodesListFragment extends Fragment
     }
 
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(EpisodeDownloadEvent event) {
-        for (String downloadUrl : event.getUrls()) {
-            int pos = FeedItemUtil.indexOfItemWithDownloadUrl(episodes, downloadUrl);
-            if (pos >= 0) {
-                listAdapter.notifyItemChangedCompat(pos);
+    public void onEventMainThread(DownloadEvent event) {
+        Log.d(TAG, "onEventMainThread() called with: " + "event = [" + event + "]");
+        DownloaderUpdate update = event.update;
+        updateToolbar();
+        if (update.mediaIds.length > 0) {
+            for (long mediaId : update.mediaIds) {
+                int pos = FeedItemUtil.indexOfItemWithMediaId(episodes, mediaId);
+                if (pos >= 0) {
+                    listAdapter.notifyItemChangedCompat(pos);
+                }
             }
         }
     }
@@ -417,33 +445,31 @@ public abstract class EpisodesListFragment extends Fragment
         disposable = Observable.fromCallable(() -> new Pair<>(loadData(), loadTotalItemCount()))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                        data -> {
-                            final boolean restoreScrollPosition = episodes.isEmpty();
-                            episodes = data.first;
-                            hasMoreItems = !(page == 1 && episodes.size() < EPISODES_PER_PAGE);
-                            progressBar.setVisibility(View.GONE);
-                            listAdapter.setDummyViews(0);
-                            listAdapter.updateItems(episodes);
-                            listAdapter.setTotalNumberOfItems(data.second);
-                            if (restoreScrollPosition) {
-                                recyclerView.restoreScrollPosition(getPrefName());
-                            }
-                            updateToolbar();
-                        }, error -> {
-                            listAdapter.setDummyViews(0);
-                            listAdapter.updateItems(Collections.emptyList());
-                            Log.e(TAG, Log.getStackTraceString(error));
-                        });
+                .subscribe(data -> {
+                    progLoading.setVisibility(View.GONE);
+                    loadingMoreView.setVisibility(View.GONE);
+                    hasMoreItems = true;
+                    episodes = data.first;
+                    listAdapter.notifyDataSetChanged();
+                    listAdapter.setTotalNumberOfItems(data.second);
+                    updateAdapterWithNewItems();
+                    updateToolbar();
+                }, error -> Log.e(TAG, Log.getStackTraceString(error)));
     }
 
     @NonNull
-    protected abstract List<FeedItem> loadData();
+    protected List<FeedItem> loadData() {
+        return DBReader.getRecentlyPublishedEpisodes(0, page * EPISODES_PER_PAGE, getFilter());
+    }
 
     @NonNull
-    protected abstract List<FeedItem> loadMoreData(int page);
+    protected List<FeedItem> loadMoreData(int page) {
+        return DBReader.getRecentlyPublishedEpisodes((page - 1) * EPISODES_PER_PAGE, EPISODES_PER_PAGE, getFilter());
+    }
 
-    protected abstract int loadTotalItemCount();
+    protected int loadTotalItemCount() {
+        return DBReader.getTotalEpisodeCount(getFilter());
+    }
 
     protected abstract FeedItemFilter getFilter();
 
@@ -452,12 +478,9 @@ public abstract class EpisodesListFragment extends Fragment
     protected abstract String getPrefName();
 
     protected void updateToolbar() {
-    }
-
-    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(FeedUpdateRunningEvent event) {
         if (toolbar.getMenu().findItem(R.id.refresh_item) != null) {
-            MenuItemUtils.updateRefreshMenuItem(toolbar.getMenu(), R.id.refresh_item, event.isFeedUpdateRunning);
+            MenuItemUtils.updateRefreshMenuItem(toolbar.getMenu(), R.id.refresh_item,
+                    DownloadService.isRunning && DownloadService.isDownloadingFeeds());
         }
     }
 

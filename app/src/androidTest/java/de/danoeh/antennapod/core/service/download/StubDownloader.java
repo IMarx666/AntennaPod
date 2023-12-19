@@ -2,18 +2,16 @@ package de.danoeh.antennapod.core.service.download;
 
 import androidx.annotation.NonNull;
 import androidx.core.util.Consumer;
-import de.danoeh.antennapod.model.download.DownloadResult;
-import de.danoeh.antennapod.net.download.serviceinterface.DownloadRequest;
+import de.danoeh.antennapod.model.download.DownloadStatus;
 
 public class StubDownloader extends Downloader {
 
     private final long downloadTime;
 
     @NonNull
-    private final Consumer<DownloadResult> onDownloadComplete;
+    private final Consumer<DownloadStatus> onDownloadComplete;
 
-    public StubDownloader(@NonNull DownloadRequest request, long downloadTime,
-                          @NonNull Consumer<DownloadResult> onDownloadComplete) {
+    public StubDownloader(@NonNull DownloadRequest request, long downloadTime, @NonNull Consumer<DownloadStatus> onDownloadComplete) {
         super(request);
         this.downloadTime = downloadTime;
         this.onDownloadComplete = onDownloadComplete;
@@ -37,7 +35,7 @@ public class StubDownloader extends Downloader {
 
     @NonNull
     @Override
-    public DownloadResult getResult() {
+    public DownloadStatus getResult() {
         return super.getResult();
     }
 

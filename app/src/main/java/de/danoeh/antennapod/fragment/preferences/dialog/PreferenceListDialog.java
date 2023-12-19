@@ -2,7 +2,7 @@ package de.danoeh.antennapod.fragment.preferences.dialog;
 
 import android.content.Context;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 
 import de.danoeh.antennapod.R;
 
@@ -29,7 +29,7 @@ public class PreferenceListDialog {
 
     public void openDialog(String[] items) {
 
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(title);
         builder.setSingleChoiceItems(items, selectedPos, (dialog, which) -> {
             selectedPos = which;

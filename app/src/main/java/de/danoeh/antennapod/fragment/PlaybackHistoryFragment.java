@@ -1,6 +1,5 @@
 package de.danoeh.antennapod.fragment;
 
-import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -8,7 +7,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.core.dialog.ConfirmationDialog;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.event.playback.PlaybackHistoryEvent;
@@ -32,6 +30,7 @@ public class PlaybackHistoryFragment extends EpisodesListFragment {
         emptyView.setIcon(R.drawable.ic_history);
         emptyView.setTitle(R.string.no_history_head_label);
         emptyView.setMessage(R.string.no_history_label);
+        swipeActions.detach();
         return root;
     }
 
@@ -56,20 +55,7 @@ public class PlaybackHistoryFragment extends EpisodesListFragment {
             return true;
         }
         if (item.getItemId() == R.id.clear_history_item) {
-
-            ConfirmationDialog conDialog = new ConfirmationDialog(
-                    getActivity(),
-                    R.string.clear_history_label,
-                    R.string.clear_playback_history_msg) {
-
-                @Override
-                public void onConfirmButtonPressed(DialogInterface dialog) {
-                    dialog.dismiss();
-                    DBWriter.clearPlaybackHistory();
-                }
-            };
-            conDialog.createNewDialog().show();
-
+            DBWriter.clearPlaybackHistory();
             return true;
         }
         return false;

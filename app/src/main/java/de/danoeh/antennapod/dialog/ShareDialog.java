@@ -23,7 +23,7 @@ public class ShareDialog extends BottomSheetDialogFragment {
     private FeedItem item;
     private SharedPreferences prefs;
 
-    private ShareEpisodeDialogBinding viewBinding;
+    ShareEpisodeDialogBinding viewBinding;
 
     public ShareDialog() {
         // Empty constructor required for DialogFragment

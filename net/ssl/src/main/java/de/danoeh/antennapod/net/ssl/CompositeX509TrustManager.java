@@ -1,7 +1,5 @@
 package de.danoeh.antennapod.net.ssl;
 
-import android.annotation.SuppressLint;
-
 import javax.net.ssl.X509TrustManager;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -14,7 +12,6 @@ import java.util.List;
  * trusts a certificate chain, then it is trusted by the composite manager.
  * Based on https://stackoverflow.com/a/16229909
  */
-@SuppressLint("CustomX509TrustManager")
 public class CompositeX509TrustManager implements X509TrustManager {
     private final List<X509TrustManager> trustManagers;
 

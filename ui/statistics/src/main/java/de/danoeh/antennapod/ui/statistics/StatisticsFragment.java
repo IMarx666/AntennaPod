@@ -10,7 +10,7 @@ import android.view.ViewGroup;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import com.google.android.material.appbar.MaterialToolbar;
+import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
@@ -48,7 +48,7 @@ public class StatisticsFragment extends PagedToolbarFragment {
 
     private TabLayout tabLayout;
     private ViewPager2 viewPager;
-    private MaterialToolbar toolbar;
+    private Toolbar toolbar;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,

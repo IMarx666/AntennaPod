@@ -3,10 +3,6 @@ plugins {
 }
 apply from: "../../../common.gradle"
 
-android {
-    namespace "de.danoeh.antennapod.net.sync.gpoddernet"
-}
-
 dependencies {
     implementation project(':net:sync:model')
 

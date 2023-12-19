@@ -20,16 +20,16 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission;
 import androidx.annotation.Nullable;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.core.export.opml.OpmlElement;
 import de.danoeh.antennapod.core.export.opml.OpmlReader;
-import de.danoeh.antennapod.core.preferences.ThemeSwitcher;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 
-import de.danoeh.antennapod.core.storage.DBTasks;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
+import de.danoeh.antennapod.core.service.download.DownloadService;
+import de.danoeh.antennapod.core.service.download.DownloadRequestCreator;
 import de.danoeh.antennapod.databinding.OpmlSelectionBinding;
 import de.danoeh.antennapod.model.feed.Feed;
 import io.reactivex.Completable;
@@ -43,7 +43,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -52,7 +51,7 @@ import java.util.List;
 public class OpmlImportActivity extends AppCompatActivity {
     private static final String TAG = "OpmlImportBaseActivity";
     @Nullable private Uri uri;
-    private OpmlSelectionBinding viewBinding;
+    OpmlSelectionBinding viewBinding;
     private ArrayAdapter<String> listAdapter;
     private MenuItem selectAll;
     private MenuItem deselectAll;
@@ -60,7 +59,7 @@ public class OpmlImportActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
-        setTheme(ThemeSwitcher.getTheme(this));
+        setTheme(UserPreferences.getTheme());
         super.onCreate(savedInstanceState);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         viewBinding = OpmlSelectionBinding.inflate(getLayoutInflater());
@@ -96,12 +95,9 @@ public class OpmlImportActivity extends AppCompatActivity {
                         continue;
                     }
                     OpmlElement element = readElements.get(checked.keyAt(i));
-                    Feed feed = new Feed(element.getXmlUrl(), null,
-                            element.getText() != null ? element.getText() : "Unknown podcast");
-                    feed.setItems(Collections.emptyList());
-                    DBTasks.updateFeed(this, feed, false);
+                    Feed feed = new Feed(element.getXmlUrl(), null, element.getText());
+                    DownloadService.download(this, false, DownloadRequestCreator.create(feed).build());
                 }
-                FeedUpdateManager.runOnce(this);
             })
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
@@ -113,7 +109,6 @@ public class OpmlImportActivity extends AppCompatActivity {
                                 startActivity(intent);
                                 finish();
                             }, e -> {
-                                e.printStackTrace();
                                 viewBinding.progressBar.setVisibility(View.GONE);
                                 Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
                             });
@@ -133,7 +128,7 @@ public class OpmlImportActivity extends AppCompatActivity {
 
     void importUri(@Nullable Uri uri) {
         if (uri == null) {
-            new MaterialAlertDialogBuilder(this)
+            new AlertDialog.Builder(this)
                     .setMessage(R.string.opml_import_error_no_file)
                     .setPositiveButton(android.R.string.ok, null)
                     .show();
@@ -207,7 +202,7 @@ public class OpmlImportActivity extends AppCompatActivity {
                 if (isGranted) {
                     startImport();
                 } else {
-                    new MaterialAlertDialogBuilder(this)
+                    new AlertDialog.Builder(this)
                             .setMessage(R.string.opml_import_ask_read_permission)
                             .setPositiveButton(android.R.string.ok, (dialog, which) ->
                                     requestPermission())
@@ -245,7 +240,7 @@ public class OpmlImportActivity extends AppCompatActivity {
                             viewBinding.feedlist.setAdapter(listAdapter);
                         }, e -> {
                             viewBinding.progressBar.setVisibility(View.GONE);
-                            MaterialAlertDialogBuilder alert = new MaterialAlertDialogBuilder(this);
+                            AlertDialog.Builder alert = new AlertDialog.Builder(this);
                             alert.setTitle(R.string.error_label);
                             alert.setMessage(getString(R.string.opml_reader_error) + e.getMessage());
                             alert.setNeutralButton(android.R.string.ok, (dialog, which) -> dialog.dismiss());

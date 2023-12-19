@@ -6,7 +6,6 @@ import android.os.Parcelable;
 import androidx.core.content.ContextCompat;
 
 import de.danoeh.antennapod.core.service.playback.PlaybackService;
-import de.danoeh.antennapod.core.service.playback.PlaybackServiceInterface;
 import de.danoeh.antennapod.model.playback.Playable;
 
 public class PlaybackServiceStarter {
@@ -35,8 +34,8 @@ public class PlaybackServiceStarter {
 
     public Intent getIntent() {
         Intent launchIntent = new Intent(context, PlaybackService.class);
-        launchIntent.putExtra(PlaybackServiceInterface.EXTRA_PLAYABLE, (Parcelable) media);
-        launchIntent.putExtra(PlaybackServiceInterface.EXTRA_ALLOW_STREAM_THIS_TIME, shouldStreamThisTime);
+        launchIntent.putExtra(PlaybackService.EXTRA_PLAYABLE, (Parcelable) media);
+        launchIntent.putExtra(PlaybackService.EXTRA_ALLOW_STREAM_THIS_TIME, shouldStreamThisTime);
         return launchIntent;
     }
 

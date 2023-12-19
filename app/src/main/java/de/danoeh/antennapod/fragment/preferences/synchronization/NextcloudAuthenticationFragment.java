@@ -6,7 +6,7 @@ import android.os.Bundle;
 import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.core.service.download.AntennapodHttpClient;
@@ -23,7 +23,6 @@ import de.danoeh.antennapod.net.sync.nextcloud.NextcloudLoginFlow;
 public class NextcloudAuthenticationFragment extends DialogFragment
         implements NextcloudLoginFlow.AuthenticationCallback {
     public static final String TAG = "NextcloudAuthenticationFragment";
-    private static final String EXTRA_LOGIN_FLOW = "LoginFlow";
     private NextcloudAuthDialogBinding viewBinding;
     private NextcloudLoginFlow nextcloudLoginFlow;
     private boolean shouldDismiss = false;
@@ -31,7 +30,7 @@ public class NextcloudAuthenticationFragment extends DialogFragment
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-        MaterialAlertDialogBuilder dialog = new MaterialAlertDialogBuilder(getContext());
+        AlertDialog.Builder dialog = new AlertDialog.Builder(getContext());
         dialog.setTitle(R.string.gpodnetauth_login_butLabel);
         dialog.setNegativeButton(R.string.cancel_label, null);
         dialog.setCancelable(false);
@@ -40,33 +39,16 @@ public class NextcloudAuthenticationFragment extends DialogFragment
         viewBinding = NextcloudAuthDialogBinding.inflate(getLayoutInflater());
         dialog.setView(viewBinding.getRoot());
 
-        viewBinding.chooseHostButton.setOnClickListener(v -> {
+        viewBinding.loginButton.setOnClickListener(v -> {
+            viewBinding.errorText.setVisibility(View.GONE);
+            viewBinding.loginButton.setVisibility(View.GONE);
+            viewBinding.loginProgressContainer.setVisibility(View.VISIBLE);
             nextcloudLoginFlow = new NextcloudLoginFlow(AntennapodHttpClient.getHttpClient(),
                     viewBinding.serverUrlText.getText().toString(), getContext(), this);
-            startLoginFlow();
+            nextcloudLoginFlow.start();
         });
-        if (savedInstanceState != null && savedInstanceState.getStringArrayList(EXTRA_LOGIN_FLOW) != null) {
-            nextcloudLoginFlow = NextcloudLoginFlow.fromInstanceState(AntennapodHttpClient.getHttpClient(),
-                    getContext(), this, savedInstanceState.getStringArrayList(EXTRA_LOGIN_FLOW));
-            startLoginFlow();
-        }
+
         return dialog.create();
-    }
-
-    private void startLoginFlow() {
-        viewBinding.errorText.setVisibility(View.GONE);
-        viewBinding.chooseHostButton.setVisibility(View.GONE);
-        viewBinding.loginProgressContainer.setVisibility(View.VISIBLE);
-        viewBinding.serverUrlText.setEnabled(false);
-        nextcloudLoginFlow.start();
-    }
-
-    @Override
-    public void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (nextcloudLoginFlow != null) {
-            outState.putStringArrayList(EXTRA_LOGIN_FLOW, nextcloudLoginFlow.saveInstanceState());
-        }
     }
 
     @Override
@@ -93,7 +75,7 @@ public class NextcloudAuthenticationFragment extends DialogFragment
         SynchronizationCredentials.setHosturl(server);
         SynchronizationCredentials.setUsername(username);
         SyncService.fullSync(getContext());
-        if (isResumed()) {
+        if (isVisible()) {
             dismiss();
         } else {
             shouldDismiss = true;
@@ -105,7 +87,6 @@ public class NextcloudAuthenticationFragment extends DialogFragment
         viewBinding.loginProgressContainer.setVisibility(View.GONE);
         viewBinding.errorText.setVisibility(View.VISIBLE);
         viewBinding.errorText.setText(errorMessage);
-        viewBinding.chooseHostButton.setVisibility(View.VISIBLE);
-        viewBinding.serverUrlText.setEnabled(true);
+        viewBinding.loginButton.setVisibility(View.VISIBLE);
     }
 }

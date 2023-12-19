@@ -5,7 +5,7 @@ import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 
 import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
@@ -27,7 +27,7 @@ public class FeedStatisticsDialogFragment extends DialogFragment {
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-        MaterialAlertDialogBuilder dialog = new MaterialAlertDialogBuilder(getContext());
+        AlertDialog.Builder dialog = new AlertDialog.Builder(getContext());
         dialog.setPositiveButton(android.R.string.ok, null);
         dialog.setNeutralButton(R.string.open_podcast, (dialogInterface, i) -> {
             long feedId = getArguments().getLong(EXTRA_FEED_ID);

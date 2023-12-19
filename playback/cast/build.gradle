@@ -4,10 +4,6 @@ plugins {
 apply from: "../../common.gradle"
 apply from: "../../playFlavor.gradle"
 
-android {
-    namespace "de.danoeh.antennapod.playback.cast"
-}
-
 dependencies {
     implementation project(':event')
     implementation project(':model')
@@ -19,5 +15,5 @@ dependencies {
     annotationProcessor "org.greenrobot:eventbus-annotation-processor:$eventbusVersion"
 
     playApi 'androidx.mediarouter:mediarouter:1.2.5'
-    playApi 'com.google.android.gms:play-services-cast-framework:21.2.0'
+    playApi 'com.google.android.gms:play-services-cast-framework:20.0.0'
 }

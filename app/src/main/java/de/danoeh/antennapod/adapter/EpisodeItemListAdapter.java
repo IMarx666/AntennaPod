@@ -14,7 +14,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
-import de.danoeh.antennapod.ui.common.ThemeUtils;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.lang.ref.WeakReference;
@@ -39,17 +38,11 @@ public class EpisodeItemListAdapter extends SelectableAdapter<EpisodeItemViewHol
     private List<FeedItem> episodes = new ArrayList<>();
     private FeedItem longPressedItem;
     int longPressedPosition = 0; // used to init actionMode
-    private int dummyViews = 0;
 
     public EpisodeItemListAdapter(MainActivity mainActivity) {
         super(mainActivity);
         this.mainActivityRef = new WeakReference<>(mainActivity);
         setHasStableIds(true);
-    }
-
-    public void setDummyViews(int dummyViews) {
-        this.dummyViews = dummyViews;
-        notifyDataSetChanged();
     }
 
     public void updateItems(List<FeedItem> items) {
@@ -71,14 +64,6 @@ public class EpisodeItemListAdapter extends SelectableAdapter<EpisodeItemViewHol
 
     @Override
     public final void onBindViewHolder(EpisodeItemViewHolder holder, int pos) {
-        if (pos >= episodes.size()) {
-            beforeBindViewHolder(holder, pos);
-            holder.bindDummy();
-            afterBindViewHolder(holder, pos);
-            holder.hideSeparatorIfNecessary();
-            return;
-        }
-
         // Reset state of recycled views
         holder.coverHolder.setVisibility(View.VISIBLE);
         holder.dragHandle.setVisibility(View.GONE);
@@ -117,13 +102,12 @@ public class EpisodeItemListAdapter extends SelectableAdapter<EpisodeItemViewHol
         });
 
         if (inActionMode()) {
-            holder.secondaryActionButton.setOnClickListener(null);
-            if (isSelected(pos)) {
-                holder.itemView.setBackgroundColor(0x88000000
-                        + (0xffffff & ThemeUtils.getColorFromAttr(mainActivityRef.get(), R.attr.colorAccent)));
-            } else {
-                holder.itemView.setBackgroundResource(android.R.color.transparent);
-            }
+            holder.secondaryActionButton.setVisibility(View.GONE);
+            holder.selectCheckBox.setOnClickListener(v -> toggleSelection(holder.getBindingAdapterPosition()));
+            holder.selectCheckBox.setChecked(isSelected(pos));
+            holder.selectCheckBox.setVisibility(View.VISIBLE);
+        } else {
+            holder.selectCheckBox.setVisibility(View.GONE);
         }
 
         afterBindViewHolder(holder, pos);
@@ -171,16 +155,13 @@ public class EpisodeItemListAdapter extends SelectableAdapter<EpisodeItemViewHol
 
     @Override
     public long getItemId(int position) {
-        if (position >= episodes.size()) {
-            return RecyclerView.NO_ID; // Dummy views
-        }
         FeedItem item = episodes.get(position);
         return item != null ? item.getId() : RecyclerView.NO_POSITION;
     }
 
     @Override
     public int getItemCount() {
-        return dummyViews + episodes.size();
+        return episodes.size();
     }
 
     protected FeedItem getItem(int index) {

@@ -23,7 +23,8 @@ import junit.framework.AssertionFailedError;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
+import de.danoeh.antennapod.core.service.download.DownloadService;
 import de.danoeh.antennapod.core.service.playback.PlaybackService;
 import de.danoeh.antennapod.dialog.RatingDialog;
 import de.danoeh.antennapod.fragment.NavDrawerFragment;
@@ -171,15 +172,11 @@ public class EspressoTestUtils {
         RatingDialog.saveRated();
     }
 
-    public static void setLaunchScreen(String tag) {
+    public static void setLastNavFragment(String tag) {
         InstrumentationRegistry.getInstrumentation().getTargetContext()
                 .getSharedPreferences(NavDrawerFragment.PREF_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString(NavDrawerFragment.PREF_LAST_FRAGMENT_TAG, tag)
-                .commit();
-        PreferenceManager.getDefaultSharedPreferences(InstrumentationRegistry.getInstrumentation().getTargetContext())
-                .edit()
-                .putString(UserPreferences.PREF_DEFAULT_PAGE, UserPreferences.DEFAULT_PAGE_REMEMBER)
                 .commit();
     }
 
@@ -217,6 +214,21 @@ public class EspressoTestUtils {
             // to onDestroy takes until the next GC of the system, which we can not influence.
             // Try to wait for the service at least a bit.
             Awaitility.await().atMost(10, TimeUnit.SECONDS).until(() -> !PlaybackService.isRunning);
+        } catch (ConditionTimeoutException e) {
+            e.printStackTrace();
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+    }
+
+    public static void tryKillDownloadService() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        context.stopService(new Intent(context, DownloadService.class));
+        try {
+            // Android has no reliable way to stop a service instantly.
+            // Calling stopSelf marks allows the system to destroy the service but the actual call
+            // to onDestroy takes until the next GC of the system, which we can not influence.
+            // Try to wait for the service at least a bit.
+            Awaitility.await().atMost(10, TimeUnit.SECONDS).until(() -> !DownloadService.isRunning);
         } catch (ConditionTimeoutException e) {
             e.printStackTrace();
         }

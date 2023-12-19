@@ -16,15 +16,8 @@ public class CastStateListener implements SessionManagerListener<CastSession> {
             castContext = null;
             return;
         }
-        CastContext castCtx;
-        try {
-            castCtx = CastContext.getSharedInstance(context);
-            castCtx.getSessionManager().addSessionManagerListener(this, CastSession.class);
-        } catch (Exception e) {
-            e.printStackTrace();
-            castCtx = null;
-        }
-        castContext = castCtx;
+        castContext = CastContext.getSharedInstance(context);
+        castContext.getSessionManager().addSessionManagerListener(this, CastSession.class);
     }
 
     public void destroy() {

@@ -18,7 +18,11 @@ public class PlaybackSpeedActivityStarter {
         this.context = context;
         intent = new Intent(INTENT);
         intent.setPackage(context.getPackageName());
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+        } else {
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        }
     }
 
     public Intent getIntent() {

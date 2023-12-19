@@ -19,6 +19,7 @@ import de.danoeh.antennapod.core.R;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedCounter;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
+import de.danoeh.antennapod.core.glide.ApGlideSettings;
 import de.danoeh.antennapod.core.util.gui.NotificationUtils;
 import de.danoeh.antennapod.storage.database.PodDBAdapter;
 
@@ -94,7 +95,7 @@ public class NewEpisodesNotification {
         intent.setAction("NewEpisodes");
         intent.setComponent(new ComponentName(context, "de.danoeh.antennapod.activity.MainActivity"));
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        intent.putExtra("fragment_tag", "NewEpisodesFragment");
+        intent.putExtra("fragment_tag", "EpisodesFragment");
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent,
                 (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
 
@@ -118,7 +119,9 @@ public class NewEpisodesNotification {
             return Glide.with(context)
                     .asBitmap()
                     .load(feed.getImageUrl())
-                    .apply(new RequestOptions().centerCrop())
+                    .apply(new RequestOptions()
+                            .diskCacheStrategy(ApGlideSettings.AP_DISK_CACHE_STRATEGY)
+                            .centerCrop())
                     .submit(iconSize, iconSize)
                     .get();
         } catch (Throwable tr) {

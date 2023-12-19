@@ -10,8 +10,6 @@ import androidx.core.util.Consumer;
 import androidx.preference.PreferenceManager;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
-import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterfaceStub;
 import de.danoeh.antennapod.storage.database.PodDBAdapter;
 import org.awaitility.Awaitility;
 import org.junit.After;
@@ -34,7 +32,7 @@ import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.core.preferences.PlaybackPreferences;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.util.FeedItemUtil;
 
 import static org.junit.Assert.assertEquals;
@@ -67,7 +65,6 @@ public class DbWriterTest {
         Application app = (Application) context;
         ClientConfig.applicationCallbacks = mock(ApplicationCallbacks.class);
         when(ClientConfig.applicationCallbacks.getApplicationInstance()).thenReturn(app);
-        DownloadServiceInterface.setImpl(new DownloadServiceInterfaceStub());
 
         // create new database
         PodDBAdapter.init(context);
@@ -298,6 +295,7 @@ public class DbWriterTest {
         for (int i = 0; i < 10; i++) {
             FeedItem item = new FeedItem(0, "Item " + i, "Item" + i, "url", new Date(), FeedItem.PLAYED, feed);
             feed.getItems().add(item);
+
         }
 
         PodDBAdapter adapter = PodDBAdapter.getInstance();
@@ -443,7 +441,6 @@ public class DbWriterTest {
         // create items
         for (int i = 0; i < 10; i++) {
             FeedItem item = new FeedItem(0, "Item " + i, "Item" + i, "url", new Date(), FeedItem.PLAYED, feed);
-            item.setMedia(new FeedMedia(item, "", 0, ""));
             feed.getItems().add(item);
         }
 
@@ -522,7 +519,6 @@ public class DbWriterTest {
         feed.setItems(new ArrayList<>());
         for (int i = 0; i < numItems; i++) {
             FeedItem item = new FeedItem(0, "title " + i, "id " + i, "link " + i, new Date(), FeedItem.PLAYED, feed);
-            item.setMedia(new FeedMedia(item, "", 0, ""));
             feed.getItems().add(item);
         }
 
@@ -549,7 +545,6 @@ public class DbWriterTest {
         Feed feed = new Feed("url", null, "title");
         feed.setItems(new ArrayList<>());
         FeedItem item = new FeedItem(0, "title", "id", "link", new Date(), FeedItem.PLAYED, feed);
-        item.setMedia(new FeedMedia(item, "", 0, ""));
         feed.getItems().add(item);
 
         PodDBAdapter adapter = PodDBAdapter.getInstance();
@@ -574,7 +569,6 @@ public class DbWriterTest {
         Feed feed = new Feed("url", null, "title");
         feed.setItems(new ArrayList<>());
         FeedItem item = new FeedItem(0, "title", "id", "link", new Date(), FeedItem.PLAYED, feed);
-        item.setMedia(new FeedMedia(item, "", 0, ""));
         feed.getItems().add(item);
 
         PodDBAdapter adapter = PodDBAdapter.getInstance();
@@ -717,7 +711,6 @@ public class DbWriterTest {
         for (int i = 0; i < numItems; i++) {
             FeedItem item = new FeedItem(0, "title " + i, "id " + i, "link " + i,
                     new Date(), FeedItem.PLAYED, feed);
-            item.setMedia(new FeedMedia(item, "", 0, ""));
             feed.getItems().add(item);
         }
 
@@ -766,7 +759,6 @@ public class DbWriterTest {
         for (int i = 0; i < numItems; i++) {
             FeedItem item = new FeedItem(0, "title " + i, "id " + i, "link " + i,
                     new Date(), FeedItem.NEW, feed);
-            item.setMedia(new FeedMedia(item, "", 0, ""));
             feed.getItems().add(item);
         }
 
@@ -793,7 +785,6 @@ public class DbWriterTest {
         for (int i = 0; i < numItems; i++) {
             FeedItem item = new FeedItem(0, "title " + i, "id " + i, "link " + i,
                     new Date(), FeedItem.PLAYED, feed);
-            item.setMedia(new FeedMedia(item, "", 0, ""));
             feed.getItems().add(item);
         }
 

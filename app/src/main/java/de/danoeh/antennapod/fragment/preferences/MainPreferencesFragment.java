@@ -5,6 +5,7 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.os.Bundle;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
@@ -29,9 +30,9 @@ public class MainPreferencesFragment extends PreferenceFragmentCompat {
 
     private static final String PREF_SCREEN_USER_INTERFACE = "prefScreenInterface";
     private static final String PREF_SCREEN_PLAYBACK = "prefScreenPlayback";
-    private static final String PREF_SCREEN_DOWNLOADS = "prefScreenDownloads";
-    private static final String PREF_SCREEN_IMPORT_EXPORT = "prefScreenImportExport";
+    private static final String PREF_SCREEN_NETWORK = "prefScreenNetwork";
     private static final String PREF_SCREEN_SYNCHRONIZATION = "prefScreenSynchronization";
+    private static final String PREF_SCREEN_STORAGE = "prefScreenStorage";
     private static final String PREF_DOCUMENTATION = "prefDocumentation";
     private static final String PREF_VIEW_FORUM = "prefViewForum";
     private static final String PREF_SEND_BUG_REPORT = "prefSendBugReport";
@@ -39,6 +40,7 @@ public class MainPreferencesFragment extends PreferenceFragmentCompat {
     private static final String PREF_ABOUT = "prefAbout";
     private static final String PREF_NOTIFICATION = "notifications";
     private static final String PREF_CONTRIBUTE = "prefContribute";
+    private static final String PREF_STATISTICS = "statistics";
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -88,16 +90,16 @@ public class MainPreferencesFragment extends PreferenceFragmentCompat {
             ((PreferenceActivity) getActivity()).openScreen(R.xml.preferences_playback);
             return true;
         });
-        findPreference(PREF_SCREEN_DOWNLOADS).setOnPreferenceClickListener(preference -> {
-            ((PreferenceActivity) getActivity()).openScreen(R.xml.preferences_downloads);
+        findPreference(PREF_SCREEN_NETWORK).setOnPreferenceClickListener(preference -> {
+            ((PreferenceActivity) getActivity()).openScreen(R.xml.preferences_network);
             return true;
         });
         findPreference(PREF_SCREEN_SYNCHRONIZATION).setOnPreferenceClickListener(preference -> {
             ((PreferenceActivity) getActivity()).openScreen(R.xml.preferences_synchronization);
             return true;
         });
-        findPreference(PREF_SCREEN_IMPORT_EXPORT).setOnPreferenceClickListener(preference -> {
-            ((PreferenceActivity) getActivity()).openScreen(R.xml.preferences_import_export);
+        findPreference(PREF_SCREEN_STORAGE).setOnPreferenceClickListener(preference -> {
+            ((PreferenceActivity) getActivity()).openScreen(R.xml.preferences_storage);
             return true;
         });
         findPreference(PREF_NOTIFICATION).setOnPreferenceClickListener(preference -> {
@@ -128,6 +130,15 @@ public class MainPreferencesFragment extends PreferenceFragmentCompat {
             startActivity(new Intent(getActivity(), BugReportActivity.class));
             return true;
         });
+        findPreference(PREF_STATISTICS).setOnPreferenceClickListener(
+                preference -> {
+                    new AlertDialog.Builder(getContext())
+                            .setMessage(R.string.statistics_moved)
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show();
+                    return true;
+                }
+        );
     }
 
     private String getLocalizedWebsiteLink() {
@@ -155,12 +166,15 @@ public class MainPreferencesFragment extends PreferenceFragmentCompat {
                 .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_user_interface));
         config.index(R.xml.preferences_playback)
                 .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_playback));
-        config.index(R.xml.preferences_downloads)
-                .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_downloads));
+        config.index(R.xml.preferences_network)
+                .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_network));
+        config.index(R.xml.preferences_storage)
+                .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_storage));
         config.index(R.xml.preferences_import_export)
+                .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_storage))
                 .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_import_export));
         config.index(R.xml.preferences_autodownload)
-                .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_downloads))
+                .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_network))
                 .addBreadcrumb(R.string.automation)
                 .addBreadcrumb(PreferenceActivity.getTitleOfPage(R.xml.preferences_autodownload));
         config.index(R.xml.preferences_synchronization)

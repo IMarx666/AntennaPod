@@ -1,30 +1,22 @@
 package de.danoeh.antennapod.dialog;
 
-import android.app.Dialog;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-
+import android.widget.RadioButton;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
-import com.google.android.material.bottomsheet.BottomSheetBehavior;
-import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-import com.google.android.material.button.MaterialButtonToggleGroup;
+import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.core.feed.FeedItemFilterGroup;
+import de.danoeh.antennapod.model.feed.FeedItemFilter;
+import de.danoeh.antennapod.ui.common.RecursiveRadioGroup;
 
 import java.util.HashSet;
 import java.util.Set;
-
-import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.core.feed.FeedItemFilterGroup;
-import de.danoeh.antennapod.databinding.FilterDialogRowBinding;
-import de.danoeh.antennapod.model.feed.FeedItemFilter;
 
 public abstract class ItemFilterDialog extends BottomSheetDialogFragment {
     protected static final String ARGUMENT_FILTER = "filter";
@@ -40,67 +32,41 @@ public abstract class ItemFilterDialog extends BottomSheetDialogFragment {
         FeedItemFilter filter = (FeedItemFilter) getArguments().getSerializable(ARGUMENT_FILTER);
 
         for (FeedItemFilterGroup item : FeedItemFilterGroup.values()) {
-            FilterDialogRowBinding binding = FilterDialogRowBinding.inflate(inflater);
-            binding.getRoot().addOnButtonCheckedListener(
-                    (group, checkedId, isChecked) -> onFilterChanged(getNewFilterValues()));
-            binding.filterButton1.setText(item.values[0].displayName);
-            binding.filterButton1.setTag(item.values[0].filterId);
-            binding.filterButton2.setText(item.values[1].displayName);
-            binding.filterButton2.setTag(item.values[1].filterId);
-            binding.filterButton1.setMaxLines(3);
-            binding.filterButton1.setSingleLine(false);
-            binding.filterButton2.setMaxLines(3);
-            binding.filterButton2.setSingleLine(false);
-            rows.addView(binding.getRoot());
+            RecursiveRadioGroup row = (RecursiveRadioGroup) inflater.inflate(R.layout.filter_dialog_row, null, false);
+            row.setOnCheckedChangeListener((group, checkedId) -> onFilterChanged(getNewFilterValues()));
+            RadioButton filter1 = row.findViewById(R.id.filter_dialog_radioButton1);
+            RadioButton filter2 = row.findViewById(R.id.filter_dialog_radioButton2);
+            filter1.setText(item.values[0].displayName);
+            filter1.setTag(item.values[0].filterId);
+            filter2.setText(item.values[1].displayName);
+            filter2.setTag(item.values[1].filterId);
+            rows.addView(row);
         }
 
         for (String filterId : filter.getValues()) {
             if (!TextUtils.isEmpty(filterId)) {
-                Button button = layout.findViewWithTag(filterId);
+                RadioButton button = layout.findViewWithTag(filterId);
                 if (button != null) {
-                    ((MaterialButtonToggleGroup) button.getParent()).check(button.getId());
+                    button.setChecked(true);
                 }
             }
         }
         return layout;
     }
 
-    @NonNull
-    @Override
-    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-        Dialog dialog = super.onCreateDialog(savedInstanceState);
-        dialog.setOnShowListener(dialogInterface -> {
-            BottomSheetDialog bottomSheetDialog = (BottomSheetDialog) dialogInterface;
-            setupFullHeight(bottomSheetDialog);
-        });
-        return dialog;
-    }
-
-    private void setupFullHeight(BottomSheetDialog bottomSheetDialog) {
-        FrameLayout bottomSheet = (FrameLayout) bottomSheetDialog.findViewById(R.id.design_bottom_sheet);
-        if (bottomSheet != null) {
-            BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
-            ViewGroup.LayoutParams layoutParams = bottomSheet.getLayoutParams();
-            bottomSheet.setLayoutParams(layoutParams);
-            behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-        }
-    }
-
     protected Set<String> getNewFilterValues() {
         final Set<String> newFilterValues = new HashSet<>();
         for (int i = 0; i < rows.getChildCount(); i++) {
-            if (!(rows.getChildAt(i) instanceof MaterialButtonToggleGroup)) {
+            if (!(rows.getChildAt(i) instanceof RecursiveRadioGroup)) {
                 continue;
             }
-            MaterialButtonToggleGroup group = (MaterialButtonToggleGroup) rows.getChildAt(i);
-            if (group.getCheckedButtonId() == View.NO_ID) {
-                continue;
+            RecursiveRadioGroup group = (RecursiveRadioGroup) rows.getChildAt(i);
+            if (group.getCheckedButton() != null) {
+                String tag = (String) group.getCheckedButton().getTag();
+                if (tag != null) { // Clear buttons use no tag
+                    newFilterValues.add((String) group.getCheckedButton().getTag());
+                }
             }
-            String tag = (String) group.findViewById(group.getCheckedButtonId()).getTag();
-            if (tag == null) { // Clear buttons use no tag
-                continue;
-            }
-            newFilterValues.add(tag);
         }
         return newFilterValues;
     }

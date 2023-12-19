@@ -1,5 +1,6 @@
 package de.danoeh.antennapod.core.service.playback;
 
+import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -14,12 +15,13 @@ import android.support.v4.media.session.MediaSessionCompat;
 import android.util.Log;
 import android.view.KeyEvent;
 import androidx.annotation.NonNull;
-import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import de.danoeh.antennapod.core.R;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.glide.ApGlideSettings;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.receiver.MediaButtonReceiver;
 import de.danoeh.antennapod.core.util.Converter;
 import de.danoeh.antennapod.core.feed.util.ImageResourceUtils;
@@ -70,7 +72,9 @@ public class PlaybackServiceNotificationBuilder {
 
     public void loadIcon() {
         int iconSize = (int) (128 * context.getResources().getDisplayMetrics().density);
-        final RequestOptions options = new RequestOptions().centerCrop();
+        final RequestOptions options = new RequestOptions()
+                .diskCacheStrategy(ApGlideSettings.AP_DISK_CACHE_STRATEGY)
+                .centerCrop();
         try {
             icon = Glide.with(context)
                     .asBitmap()
@@ -109,6 +113,7 @@ public class PlaybackServiceNotificationBuilder {
         return defaultIcon;
     }
 
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private static Bitmap getBitmap(VectorDrawable vectorDrawable) {
         Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(),
                 vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
@@ -119,10 +124,10 @@ public class PlaybackServiceNotificationBuilder {
     }
 
     private static Bitmap getBitmap(Context context, int drawableId) {
-        Drawable drawable = AppCompatResources.getDrawable(context, drawableId);
+        Drawable drawable = ContextCompat.getDrawable(context, drawableId);
         if (drawable instanceof BitmapDrawable) {
             return ((BitmapDrawable) drawable).getBitmap();
-        } else if (drawable instanceof VectorDrawable) {
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && drawable instanceof VectorDrawable) {
             return getBitmap((VectorDrawable) drawable);
         } else {
             return null;
@@ -210,14 +215,17 @@ public class PlaybackServiceNotificationBuilder {
         }
         numActions++;
 
-        PendingIntent skipButtonPendingIntent = getPendingIntentForMediaAction(
-                KeyEvent.KEYCODE_MEDIA_NEXT, numActions);
-        notification.addAction(R.drawable.ic_notification_skip, context.getString(R.string.skip_episode_label),
-                skipButtonPendingIntent);
-        if (UserPreferences.showSkipOnCompactNotification()) {
-            compactActionList.add(numActions);
+        if (UserPreferences.isFollowQueue()) {
+            PendingIntent skipButtonPendingIntent = getPendingIntentForMediaAction(
+                    KeyEvent.KEYCODE_MEDIA_NEXT, numActions);
+            notification.addAction(R.drawable.ic_notification_skip,
+                    context.getString(R.string.skip_episode_label),
+                    skipButtonPendingIntent);
+            if (UserPreferences.showSkipOnCompactNotification()) {
+                compactActionList.add(numActions);
+            }
+            numActions++;
         }
-        numActions++;
 
         PendingIntent stopButtonPendingIntent = getPendingIntentForMediaAction(
                 KeyEvent.KEYCODE_MEDIA_STOP, numActions);

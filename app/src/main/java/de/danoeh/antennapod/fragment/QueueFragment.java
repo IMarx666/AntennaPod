@@ -17,46 +17,46 @@ import android.widget.CheckBox;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.SimpleItemAnimator;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-import com.google.android.material.appbar.MaterialToolbar;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import com.google.android.material.snackbar.Snackbar;
 import com.leinardi.android.speeddial.SpeedDialView;
+
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.adapter.EpisodeItemListAdapter;
 import de.danoeh.antennapod.adapter.QueueRecyclerAdapter;
 import de.danoeh.antennapod.core.dialog.ConfirmationDialog;
-import de.danoeh.antennapod.core.feed.util.PlaybackSpeedUtils;
+import de.danoeh.antennapod.core.event.DownloadEvent;
+import de.danoeh.antennapod.core.event.DownloaderUpdate;
+import de.danoeh.antennapod.event.FeedItemEvent;
+import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
+import de.danoeh.antennapod.event.PlayerStatusEvent;
+import de.danoeh.antennapod.event.QueueEvent;
+import de.danoeh.antennapod.event.UnreadItemsUpdateEvent;
 import de.danoeh.antennapod.core.menuhandler.MenuItemUtils;
+import de.danoeh.antennapod.fragment.actions.EpisodeMultiSelectActionHandler;
+import de.danoeh.antennapod.fragment.swipeactions.SwipeActions;
+import de.danoeh.antennapod.model.feed.FeedItem;
+import de.danoeh.antennapod.core.feed.util.PlaybackSpeedUtils;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
+import de.danoeh.antennapod.core.service.download.DownloadService;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.core.util.Converter;
 import de.danoeh.antennapod.core.util.FeedItemUtil;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
-import de.danoeh.antennapod.dialog.ItemSortDialog;
-import de.danoeh.antennapod.event.EpisodeDownloadEvent;
-import de.danoeh.antennapod.event.FeedItemEvent;
-import de.danoeh.antennapod.event.FeedUpdateRunningEvent;
-import de.danoeh.antennapod.event.PlayerStatusEvent;
-import de.danoeh.antennapod.event.QueueEvent;
-import de.danoeh.antennapod.event.UnreadItemsUpdateEvent;
-import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
-import de.danoeh.antennapod.fragment.actions.EpisodeMultiSelectActionHandler;
-import de.danoeh.antennapod.fragment.swipeactions.SwipeActions;
-import de.danoeh.antennapod.menuhandler.FeedItemMenuHandler;
-import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.SortOrder;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.util.download.AutoUpdateManager;
+import de.danoeh.antennapod.menuhandler.FeedItemMenuHandler;
 import de.danoeh.antennapod.view.EmptyViewHandler;
 import de.danoeh.antennapod.view.EpisodeItemListRecyclerView;
-import de.danoeh.antennapod.view.LiftOnScrollListener;
 import de.danoeh.antennapod.view.viewholder.EpisodeItemViewHolder;
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -72,7 +72,7 @@ import java.util.Locale;
 /**
  * Shows all items in the queue.
  */
-public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuItemClickListener,
+public class QueueFragment extends Fragment implements Toolbar.OnMenuItemClickListener,
         EpisodeItemListAdapter.OnSelectModeListener {
     public static final String TAG = "QueueFragment";
     private static final String KEY_UP_ARROW = "up_arrow";
@@ -81,7 +81,8 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     private EpisodeItemListRecyclerView recyclerView;
     private QueueRecyclerAdapter recyclerAdapter;
     private EmptyViewHandler emptyView;
-    private MaterialToolbar toolbar;
+    private ProgressBar progLoading;
+    private Toolbar toolbar;
     private boolean displayUpArrow;
 
     private List<FeedItem> queue;
@@ -94,7 +95,6 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     private SharedPreferences prefs;
 
     private SpeedDialView speedDialView;
-    private ProgressBar progressBar;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -107,7 +107,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     public void onStart() {
         super.onStart();
         if (queue != null) {
-            recyclerView.restoreScrollPosition(QueueFragment.TAG);
+            onFragmentLoaded(true);
         }
         loadItems(true);
         EventBus.getDefault().register(this);
@@ -145,7 +145,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
             case SET_QUEUE:
             case SORTED: //Deliberate fall-through
                 queue = event.items;
-                recyclerAdapter.updateItems(event.items);
+                recyclerAdapter.notifyDataSetChanged();
                 break;
             case REMOVED:
             case IRREVERSIBLE_REMOVED:
@@ -155,15 +155,13 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
                 break;
             case CLEARED:
                 queue.clear();
-                recyclerAdapter.updateItems(queue);
+                recyclerAdapter.notifyDataSetChanged();
                 break;
             case MOVED:
                 return;
         }
-        recyclerAdapter.updateDragDropEnabled();
-        refreshToolbarState();
         recyclerView.saveScrollPosition(QueueFragment.TAG);
-        refreshInfoBar();
+        onFragmentLoaded(false);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -188,14 +186,16 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     }
 
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(EpisodeDownloadEvent event) {
-        if (queue == null) {
-            return;
-        }
-        for (String downloadUrl : event.getUrls()) {
-            int pos = FeedItemUtil.indexOfItemWithDownloadUrl(queue, downloadUrl);
-            if (pos >= 0) {
-                recyclerAdapter.notifyItemChangedCompat(pos);
+    public void onEventMainThread(DownloadEvent event) {
+        Log.d(TAG, "onEventMainThread() called with DownloadEvent");
+        DownloaderUpdate update = event.update;
+        refreshToolbarState();
+        if (recyclerAdapter != null && update.mediaIds.length > 0) {
+            for (long mediaId : update.mediaIds) {
+                int pos = FeedItemUtil.indexOfItemWithMediaId(queue, mediaId);
+                if (pos >= 0) {
+                    recyclerAdapter.notifyItemChangedCompat(pos);
+                }
             }
         }
     }
@@ -251,21 +251,16 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
             recyclerAdapter.endSelectMode();
         }
         recyclerAdapter = null;
-        if (toolbar != null) {
-            toolbar.setOnMenuItemClickListener(null);
-            toolbar.setOnLongClickListener(null);
-        }
     }
 
     private void refreshToolbarState() {
         boolean keepSorted = UserPreferences.isQueueKeepSorted();
         toolbar.getMenu().findItem(R.id.queue_lock).setChecked(UserPreferences.isQueueLocked());
         toolbar.getMenu().findItem(R.id.queue_lock).setVisible(!keepSorted);
-    }
-
-    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(FeedUpdateRunningEvent event) {
-        MenuItemUtils.updateRefreshMenuItem(toolbar.getMenu(), R.id.refresh_item, event.isFeedUpdateRunning);
+        toolbar.getMenu().findItem(R.id.queue_sort_random).setVisible(!keepSorted);
+        toolbar.getMenu().findItem(R.id.queue_keep_sorted).setChecked(keepSorted);
+        MenuItemUtils.updateRefreshMenuItem(toolbar.getMenu(),
+                R.id.refresh_item, DownloadService.isRunning && DownloadService.isDownloadingFeeds());
     }
 
     @Override
@@ -274,11 +269,8 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         if (itemId == R.id.queue_lock) {
             toggleQueueLock();
             return true;
-        } else if (itemId == R.id.queue_sort) {
-            new QueueSortDialog().show(getChildFragmentManager().beginTransaction(), "SortDialog");
-            return true;
         } else if (itemId == R.id.refresh_item) {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             return true;
         } else if (itemId == R.id.clear_queue) {
             // make sure the user really wants to clear the queue
@@ -294,6 +286,52 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
                 }
             };
             conDialog.createNewDialog().show();
+            return true;
+        } else if (itemId == R.id.queue_sort_episode_title_asc) {
+            setSortOrder(SortOrder.EPISODE_TITLE_A_Z);
+            return true;
+        } else if (itemId == R.id.queue_sort_episode_title_desc) {
+            setSortOrder(SortOrder.EPISODE_TITLE_Z_A);
+            return true;
+        } else if (itemId == R.id.queue_sort_date_asc) {
+            setSortOrder(SortOrder.DATE_OLD_NEW);
+            return true;
+        } else if (itemId == R.id.queue_sort_date_desc) {
+            setSortOrder(SortOrder.DATE_NEW_OLD);
+            return true;
+        } else if (itemId == R.id.queue_sort_duration_asc) {
+            setSortOrder(SortOrder.DURATION_SHORT_LONG);
+            return true;
+        } else if (itemId == R.id.queue_sort_duration_desc) {
+            setSortOrder(SortOrder.DURATION_LONG_SHORT);
+            return true;
+        } else if (itemId == R.id.queue_sort_feed_title_asc) {
+            setSortOrder(SortOrder.FEED_TITLE_A_Z);
+            return true;
+        } else if (itemId == R.id.queue_sort_feed_title_desc) {
+            setSortOrder(SortOrder.FEED_TITLE_Z_A);
+            return true;
+        } else if (itemId == R.id.queue_sort_random) {
+            setSortOrder(SortOrder.RANDOM);
+            return true;
+        } else if (itemId == R.id.queue_sort_smart_shuffle_asc) {
+            setSortOrder(SortOrder.SMART_SHUFFLE_OLD_NEW);
+            return true;
+        } else if (itemId == R.id.queue_sort_smart_shuffle_desc) {
+            setSortOrder(SortOrder.SMART_SHUFFLE_NEW_OLD);
+            return true;
+        } else if (itemId == R.id.queue_keep_sorted) {
+            boolean keepSortedOld = UserPreferences.isQueueKeepSorted();
+            boolean keepSortedNew = !keepSortedOld;
+            UserPreferences.setQueueKeepSorted(keepSortedNew);
+            if (keepSortedNew) {
+                SortOrder sortOrder = UserPreferences.getQueueKeepSortedOrder();
+                DBWriter.reorderQueue(sortOrder, true);
+            }
+            if (recyclerAdapter != null) {
+                recyclerAdapter.updateDragDropEnabled();
+            }
+            refreshToolbarState();
             return true;
         } else if (itemId == R.id.action_search) {
             ((MainActivity) getActivity()).loadChildFragment(SearchFragment.newInstance());
@@ -311,7 +349,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
             if (!shouldShowLockWarning) {
                 setQueueLocked(true);
             } else {
-                MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(getContext());
+                AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
                 builder.setTitle(R.string.lock_queue);
                 builder.setMessage(R.string.queue_lock_warning);
 
@@ -342,6 +380,16 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
                 ((MainActivity) getActivity()).showSnackbarAbovePlayer(R.string.queue_unlocked, Snackbar.LENGTH_SHORT);
             }
         }
+    }
+
+    /**
+     * This method is called if the user clicks on a sort order menu item.
+     *
+     * @param sortOrder New sort order.
+     */
+    private void setSortOrder(SortOrder sortOrder) {
+        UserPreferences.setQueueKeepSortedOrder(sortOrder);
+        DBWriter.reorderQueue(sortOrder, true);
     }
 
     @Override
@@ -398,8 +446,6 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         ((MainActivity) getActivity()).setupToolbarToggle(toolbar, displayUpArrow);
         toolbar.inflateMenu(R.menu.queue);
         refreshToolbarState();
-        progressBar = root.findViewById(R.id.progressBar);
-        progressBar.setVisibility(View.VISIBLE);
 
         infoBar = root.findViewById(R.id.info_bar);
         recyclerView = root.findViewById(R.id.recyclerView);
@@ -409,36 +455,27 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         }
         recyclerView.setRecycledViewPool(((MainActivity) getActivity()).getRecycledViewPool());
         registerForContextMenu(recyclerView);
-        recyclerView.addOnScrollListener(new LiftOnScrollListener(root.findViewById(R.id.appbar)));
-
-        swipeActions = new QueueSwipeActions();
-        swipeActions.setFilter(new FeedItemFilter(FeedItemFilter.QUEUED));
-        swipeActions.attachTo(recyclerView);
-
-        recyclerAdapter = new QueueRecyclerAdapter((MainActivity) getActivity(), swipeActions) {
-            @Override
-            public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
-                super.onCreateContextMenu(menu, v, menuInfo);
-                MenuItemUtils.setOnClickListeners(menu, QueueFragment.this::onContextItemSelected);
-            }
-        };
-        recyclerAdapter.setOnSelectModeListener(this);
-        recyclerView.setAdapter(recyclerAdapter);
 
         SwipeRefreshLayout swipeRefreshLayout = root.findViewById(R.id.swipeRefresh);
         swipeRefreshLayout.setDistanceToTriggerSync(getResources().getInteger(R.integer.swipe_refresh_distance));
         swipeRefreshLayout.setOnRefreshListener(() -> {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             new Handler(Looper.getMainLooper()).postDelayed(() -> swipeRefreshLayout.setRefreshing(false),
                     getResources().getInteger(R.integer.swipe_to_refresh_duration_in_ms));
         });
+
+        swipeActions = new QueueSwipeActions();
+        swipeActions.setFilter(new FeedItemFilter(FeedItemFilter.QUEUED));
+        swipeActions.attachTo(recyclerView);
 
         emptyView = new EmptyViewHandler(getContext());
         emptyView.attachToRecyclerView(recyclerView);
         emptyView.setIcon(R.drawable.ic_playlist_play);
         emptyView.setTitle(R.string.no_items_header_label);
         emptyView.setMessage(R.string.no_items_label);
-        emptyView.updateAdapter(recyclerAdapter);
+
+        progLoading = root.findViewById(R.id.progLoading);
+        progLoading.setVisibility(View.VISIBLE);
 
         speedDialView = root.findViewById(R.id.fabSD);
         speedDialView.setOverlayLayout(root.findViewById(R.id.fabSDOverlay));
@@ -446,7 +483,6 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         speedDialView.removeActionItemById(R.id.mark_read_batch);
         speedDialView.removeActionItemById(R.id.mark_unread_batch);
         speedDialView.removeActionItemById(R.id.add_to_queue_batch);
-        speedDialView.removeActionItemById(R.id.remove_all_inbox_item);
         speedDialView.setOnChangeListener(new SpeedDialView.OnChangeListener() {
             @Override
             public boolean onMainActionSelected() {
@@ -475,6 +511,38 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
     public void onSaveInstanceState(@NonNull Bundle outState) {
         outState.putBoolean(KEY_UP_ARROW, displayUpArrow);
         super.onSaveInstanceState(outState);
+    }
+
+    private void onFragmentLoaded(final boolean restoreScrollPosition) {
+        if (queue != null) {
+            if (recyclerAdapter == null) {
+                MainActivity activity = (MainActivity) getActivity();
+                recyclerAdapter = new QueueRecyclerAdapter(activity, swipeActions) {
+                    @Override
+                    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+                        super.onCreateContextMenu(menu, v, menuInfo);
+                        MenuItemUtils.setOnClickListeners(menu, QueueFragment.this::onContextItemSelected);
+                    }
+                };
+                recyclerAdapter.setOnSelectModeListener(this);
+                recyclerView.setAdapter(recyclerAdapter);
+                emptyView.updateAdapter(recyclerAdapter);
+            }
+            recyclerAdapter.updateItems(queue);
+        } else {
+            recyclerAdapter = null;
+            emptyView.updateAdapter(null);
+        }
+
+        if (restoreScrollPosition) {
+            recyclerView.restoreScrollPosition(QueueFragment.TAG);
+        }
+
+        // we need to refresh the options menu because it sometimes
+        // needs data that may have just been loaded.
+        refreshToolbarState();
+
+        refreshInfoBar();
     }
 
     private void refreshInfoBar() {
@@ -506,19 +574,18 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         }
         if (queue == null) {
             emptyView.hide();
+            progLoading.setVisibility(View.VISIBLE);
         }
         disposable = Observable.fromCallable(DBReader::getQueue)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(items -> {
+                    progLoading.setVisibility(View.GONE);
                     queue = items;
-                    progressBar.setVisibility(View.GONE);
-                    recyclerAdapter.setDummyViews(0);
-                    recyclerAdapter.updateItems(queue);
-                    if (restoreScrollPosition) {
-                        recyclerView.restoreScrollPosition(QueueFragment.TAG);
+                    onFragmentLoaded(restoreScrollPosition);
+                    if (recyclerAdapter != null) {
+                        recyclerAdapter.notifyDataSetChanged();
                     }
-                    refreshInfoBar();
                 }, error -> Log.e(TAG, Log.getStackTraceString(error)));
     }
 
@@ -536,40 +603,6 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         speedDialView.setVisibility(View.GONE);
         infoBar.setVisibility(View.VISIBLE);
         swipeActions.attachTo(recyclerView);
-    }
-
-    public static class QueueSortDialog extends ItemSortDialog {
-        @Nullable
-        @Override
-        public View onCreateView(@NonNull LayoutInflater inflater,
-                                 @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-            if (UserPreferences.isQueueKeepSorted()) {
-                sortOrder = UserPreferences.getQueueKeepSortedOrder();
-            }
-            View view = super.onCreateView(inflater, container, savedInstanceState);
-            viewBinding.keepSortedCheckbox.setVisibility(View.VISIBLE);
-            viewBinding.keepSortedCheckbox.setChecked(UserPreferences.isQueueKeepSorted());
-            return view;
-        }
-
-        @Override
-        protected void onAddItem(int title, SortOrder ascending, SortOrder descending, boolean ascendingIsDefault) {
-            if (ascending != SortOrder.EPISODE_FILENAME_A_Z && ascending != SortOrder.SIZE_SMALL_LARGE) {
-                super.onAddItem(title, ascending, descending, ascendingIsDefault);
-            }
-        }
-
-        @Override
-        protected void onSelectionChanged() {
-            super.onSelectionChanged();
-            viewBinding.keepSortedCheckbox.setEnabled(sortOrder != SortOrder.RANDOM);
-            if (sortOrder == SortOrder.RANDOM) {
-                viewBinding.keepSortedCheckbox.setChecked(false);
-            }
-            UserPreferences.setQueueKeepSorted(viewBinding.keepSortedCheckbox.isChecked());
-            UserPreferences.setQueueKeepSortedOrder(sortOrder);
-            DBWriter.reorderQueue(sortOrder, true);
-        }
     }
 
     private class QueueSwipeActions extends SwipeActions {
@@ -597,7 +630,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
             int from = viewHolder.getBindingAdapterPosition();
             int to = target.getBindingAdapterPosition();
             Log.d(TAG, "move(" + from + ", " + to + ") in memory");
-            if (queue == null || from >= queue.size() || to >= queue.size() || from < 0 || to < 0) {
+            if (from >= queue.size() || to >= queue.size() || from < 0 || to < 0) {
                 return false;
             }
             queue.add(to, queue.remove(from));

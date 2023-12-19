@@ -4,8 +4,13 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.os.Build;
 import android.util.Log;
 
+import androidx.annotation.RequiresApi;
+import de.danoeh.antennapod.core.util.NetworkUtils;
+
+@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class ConnectionStateMonitor
         extends ConnectivityManager.NetworkCallback
         implements ConnectivityManager.OnNetworkActiveListener {
@@ -22,7 +27,7 @@ public class ConnectionStateMonitor
     @Override
     public void onNetworkActive() {
         Log.d(TAG, "ConnectionStateMonitor::onNetworkActive network connection changed");
-        NetworkConnectionChangeHandler.networkChangedDetected();
+        NetworkUtils.networkChangedDetected();
     }
 
     public void enable(Context context) {

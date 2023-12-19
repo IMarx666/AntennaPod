@@ -8,7 +8,7 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import com.google.android.material.appbar.MaterialToolbar;
+import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
@@ -31,7 +31,7 @@ import io.reactivex.schedulers.Schedulers;
 /**
  * Displays information about a list of FeedItems.
  */
-public class ItemPagerFragment extends Fragment implements MaterialToolbar.OnMenuItemClickListener {
+public class ItemPagerFragment extends Fragment implements Toolbar.OnMenuItemClickListener {
     private static final String ARG_FEEDITEMS = "feeditems";
     private static final String ARG_FEEDITEM_POS = "feeditem_pos";
     private static final String KEY_PAGER_ID = "pager_id";
@@ -48,7 +48,7 @@ public class ItemPagerFragment extends Fragment implements MaterialToolbar.OnMen
         ItemPagerFragment fragment = new ItemPagerFragment();
         Bundle args = new Bundle();
         args.putLongArray(ARG_FEEDITEMS, feeditems);
-        args.putInt(ARG_FEEDITEM_POS, Math.max(0, feedItemPos));
+        args.putInt(ARG_FEEDITEM_POS, feedItemPos);
         fragment.setArguments(args);
         return fragment;
     }
@@ -56,7 +56,7 @@ public class ItemPagerFragment extends Fragment implements MaterialToolbar.OnMen
     private long[] feedItems;
     private FeedItem item;
     private Disposable disposable;
-    private MaterialToolbar toolbar;
+    private Toolbar toolbar;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -70,7 +70,7 @@ public class ItemPagerFragment extends Fragment implements MaterialToolbar.OnMen
         toolbar.setOnMenuItemClickListener(this);
 
         feedItems = getArguments().getLongArray(ARG_FEEDITEMS);
-        final int feedItemPos = Math.max(0, getArguments().getInt(ARG_FEEDITEM_POS));
+        int feedItemPos = getArguments().getInt(ARG_FEEDITEM_POS);
 
         pager = layout.findViewById(R.id.pager);
         // FragmentStatePagerAdapter documentation:
@@ -161,9 +161,6 @@ public class ItemPagerFragment extends Fragment implements MaterialToolbar.OnMen
     }
 
     private void openPodcast() {
-        if (item == null) {
-            return;
-        }
         Fragment fragment = FeedItemlistFragment.newInstance(item.getFeedId());
         ((MainActivity) getActivity()).loadChildFragment(fragment);
     }

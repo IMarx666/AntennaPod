@@ -2,13 +2,13 @@ package de.danoeh.antennapod.model.feed;
 
 import android.content.Context;
 import android.content.SharedPreferences.Editor;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Parcel;
 import android.os.Parcelable;
 import androidx.annotation.Nullable;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaDescriptionCompat;
-import de.danoeh.antennapod.model.MediaMetadataRetrieverCompat;
 import de.danoeh.antennapod.model.playback.MediaType;
 import de.danoeh.antennapod.model.playback.Playable;
 import de.danoeh.antennapod.model.playback.RemoteMedia;
@@ -128,9 +128,6 @@ public class FeedMedia extends FeedFile implements Playable {
         if (other.size > 0) {
             size = other.size;
         }
-        if (other.duration > 0 && duration <= 0) { // Do not overwrite duration that we measured after downloading
-            duration = other.duration;
-        }
         if (other.mime_type != null) {
             mime_type = other.mime_type;
         }
@@ -146,9 +143,6 @@ public class FeedMedia extends FeedFile implements Playable {
             }
         }
         if (other.size > 0 && other.size != size) {
-            return true;
-        }
-        if (other.duration > 0 && duration <= 0) {
             return true;
         }
         return false;
@@ -458,10 +452,11 @@ public class FeedMedia extends FeedFile implements Playable {
             hasEmbeddedPicture = Boolean.FALSE;
             return;
         }
-        try (MediaMetadataRetrieverCompat mmr = new MediaMetadataRetrieverCompat()) {
+        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+        try {
             mmr.setDataSource(getLocalMediaUrl());
             byte[] image = mmr.getEmbeddedPicture();
-            if (image != null) {
+            if(image != null) {
                 hasEmbeddedPicture = Boolean.TRUE;
             } else {
                 hasEmbeddedPicture = Boolean.FALSE;

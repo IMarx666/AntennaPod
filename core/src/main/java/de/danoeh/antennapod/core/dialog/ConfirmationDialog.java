@@ -3,7 +3,6 @@ package de.danoeh.antennapod.core.dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import androidx.appcompat.app.AlertDialog;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import android.util.Log;
 
 import de.danoeh.antennapod.core.R;
@@ -44,7 +43,7 @@ public abstract class ConfirmationDialog {
     public abstract void onConfirmButtonPressed(DialogInterface dialog);
 
     public final AlertDialog createNewDialog() {
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(titleId);
         builder.setMessage(message);
         builder.setPositiveButton(positiveText != 0 ? positiveText : R.string.confirm_label,

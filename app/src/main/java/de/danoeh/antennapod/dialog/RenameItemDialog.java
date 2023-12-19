@@ -6,9 +6,8 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
-import android.view.LayoutInflater;
+import android.view.View;
 import androidx.appcompat.app.AlertDialog;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.core.storage.NavDrawerData;
 import de.danoeh.antennapod.model.feed.Feed;
@@ -38,15 +37,16 @@ public class RenameItemDialog {
             return;
         }
 
-        final EditTextDialogBinding binding = EditTextDialogBinding.inflate(LayoutInflater.from(activity));
+        View content = View.inflate(activity, R.layout.edit_text_dialog, null);
+        EditTextDialogBinding alertViewBinding = EditTextDialogBinding.bind(content);
         String title = feed != null ? feed.getTitle() : drawerItem.getTitle();
 
-        binding.urlEditText.setText(title);
-        AlertDialog dialog = new MaterialAlertDialogBuilder(activity)
-                .setView(binding.getRoot())
+        alertViewBinding.urlEditText.setText(title);
+        AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setView(content)
                 .setTitle(feed != null ? R.string.rename_feed_label : R.string.rename_tag_label)
                 .setPositiveButton(android.R.string.ok, (d, input) -> {
-                    String newTitle = binding.urlEditText.getText().toString();
+                    String newTitle = alertViewBinding.urlEditText.getText().toString();
                     if (feed != null) {
                         feed.setCustomTitle(newTitle);
                         DBWriter.setFeedCustomTitle(feed);
@@ -60,7 +60,7 @@ public class RenameItemDialog {
 
         // To prevent cancelling the dialog on button click
         dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(
-                (view) -> binding.urlEditText.setText(title));
+                (view) -> alertViewBinding.urlEditText.setText(title));
     }
 
     private void renameTag(String title) {

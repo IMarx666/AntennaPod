@@ -4,42 +4,36 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
-import android.text.format.DateFormat;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
-
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.snackbar.Snackbar;
-
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
-
-import java.util.Locale;
-
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.event.playback.SleepTimerUpdatedEvent;
 import de.danoeh.antennapod.core.preferences.SleepTimerPreferences;
 import de.danoeh.antennapod.core.service.playback.PlaybackService;
 import de.danoeh.antennapod.core.util.Converter;
 import de.danoeh.antennapod.core.util.playback.PlaybackController;
-import de.danoeh.antennapod.event.playback.SleepTimerUpdatedEvent;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 public class SleepTimerDialog extends DialogFragment {
     private PlaybackController controller;
     private EditText etxtTime;
+    private Spinner spTimeUnit;
     private LinearLayout timeSetup;
     private LinearLayout timeDisplay;
     private TextView time;
-    private CheckBox chAutoEnable;
 
     public SleepTimerDialog() {
 
@@ -70,12 +64,13 @@ public class SleepTimerDialog extends DialogFragment {
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         View content = View.inflate(getContext(), R.layout.time_dialog, null);
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(getContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle(R.string.sleep_timer_label);
         builder.setView(content);
         builder.setPositiveButton(R.string.close_label, null);
 
         etxtTime = content.findViewById(R.id.etxtTime);
+        spTimeUnit = content.findViewById(R.id.spTimeUnit);
         timeSetup = content.findViewById(R.id.timeSetup);
         timeDisplay = content.findViewById(R.id.timeDisplay);
         timeDisplay.setVisibility(View.GONE);
@@ -108,34 +103,30 @@ public class SleepTimerDialog extends DialogFragment {
             imm.showSoftInput(etxtTime, InputMethodManager.SHOW_IMPLICIT);
         }, 100);
 
-        final CheckBox cbShakeToReset = content.findViewById(R.id.cbShakeToReset);
-        final CheckBox cbVibrate = content.findViewById(R.id.cbVibrate);
-        chAutoEnable = content.findViewById(R.id.chAutoEnable);
-        final ImageView changeTimesButton = content.findViewById(R.id.changeTimesButton);
+        String[] spinnerContent = new String[] {
+                getString(R.string.time_seconds),
+                getString(R.string.time_minutes),
+                getString(R.string.time_hours) };
+        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(getContext(),
+                android.R.layout.simple_spinner_item, spinnerContent);
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spTimeUnit.setAdapter(spinnerAdapter);
+        spTimeUnit.setSelection(SleepTimerPreferences.lastTimerTimeUnit());
+
+        CheckBox cbShakeToReset = content.findViewById(R.id.cbShakeToReset);
+        CheckBox cbVibrate = content.findViewById(R.id.cbVibrate);
+        CheckBox chAutoEnable = content.findViewById(R.id.chAutoEnable);
 
         cbShakeToReset.setChecked(SleepTimerPreferences.shakeToReset());
         cbVibrate.setChecked(SleepTimerPreferences.vibrate());
         chAutoEnable.setChecked(SleepTimerPreferences.autoEnable());
-        changeTimesButton.setEnabled(chAutoEnable.isChecked());
-        changeTimesButton.setAlpha(chAutoEnable.isChecked() ? 1.0f : 0.5f);
 
         cbShakeToReset.setOnCheckedChangeListener((buttonView, isChecked)
                 -> SleepTimerPreferences.setShakeToReset(isChecked));
         cbVibrate.setOnCheckedChangeListener((buttonView, isChecked)
                 -> SleepTimerPreferences.setVibrate(isChecked));
         chAutoEnable.setOnCheckedChangeListener((compoundButton, isChecked)
-                -> {
-            SleepTimerPreferences.setAutoEnable(isChecked);
-            changeTimesButton.setEnabled(isChecked);
-            changeTimesButton.setAlpha(isChecked ? 1.0f : 0.5f);
-        });
-        updateAutoEnableText();
-
-        changeTimesButton.setOnClickListener(changeTimesBtn -> {
-            int from = SleepTimerPreferences.autoEnableFrom();
-            int to = SleepTimerPreferences.autoEnableTo();
-            showTimeRangeDialog(getContext(), from, to);
-        });
+                -> SleepTimerPreferences.setAutoEnable(isChecked));
 
         Button disableButton = content.findViewById(R.id.disableSleeptimerButton);
         disableButton.setOnClickListener(v -> {
@@ -154,7 +145,7 @@ public class SleepTimerDialog extends DialogFragment {
                 if (time == 0) {
                     throw new NumberFormatException("Timer must not be zero");
                 }
-                SleepTimerPreferences.setLastTimer(etxtTime.getText().toString());
+                SleepTimerPreferences.setLastTimer(etxtTime.getText().toString(), spTimeUnit.getSelectedItemPosition());
                 if (controller != null) {
                     controller.setSleepTimer(SleepTimerPreferences.timerMillis());
                 }
@@ -165,38 +156,6 @@ public class SleepTimerDialog extends DialogFragment {
             }
         });
         return builder.create();
-    }
-
-    private void showTimeRangeDialog(Context context, int from, int to) {
-        TimeRangeDialog dialog = new TimeRangeDialog(context, from, to);
-        dialog.setOnDismissListener(v -> {
-            SleepTimerPreferences.setAutoEnableFrom(dialog.getFrom());
-            SleepTimerPreferences.setAutoEnableTo(dialog.getTo());
-            updateAutoEnableText();
-        });
-        dialog.show();
-    }
-
-    private void updateAutoEnableText() {
-        String text;
-        int from = SleepTimerPreferences.autoEnableFrom();
-        int to = SleepTimerPreferences.autoEnableTo();
-
-        if (from == to) {
-            text = getString(R.string.auto_enable_label);
-        } else if (DateFormat.is24HourFormat(getContext())) {
-            String formattedFrom = String.format(Locale.getDefault(), "%02d:00", from);
-            String formattedTo = String.format(Locale.getDefault(), "%02d:00", to);
-            text = getString(R.string.auto_enable_label_with_times, formattedFrom, formattedTo);
-        } else {
-            String formattedFrom = String.format(Locale.getDefault(), "%02d:00 %s",
-                    from % 12, from >= 12 ? "PM" : "AM");
-            String formattedTo = String.format(Locale.getDefault(), "%02d:00 %s",
-                    to % 12, to >= 12 ? "PM" : "AM");
-            text = getString(R.string.auto_enable_label_with_times, formattedFrom, formattedTo);
-
-        }
-        chAutoEnable.setText(text);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)

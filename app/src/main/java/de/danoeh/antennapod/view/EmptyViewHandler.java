@@ -7,7 +7,6 @@ import android.widget.AbsListView;
 import android.widget.FrameLayout;
 import android.widget.ListAdapter;
 import androidx.annotation.DrawableRes;
-import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.recyclerview.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -88,13 +87,6 @@ public class EmptyViewHandler {
                 parent.addView(emptyView);
                 FrameLayout.LayoutParams layoutParams =
                         (FrameLayout.LayoutParams) emptyView.getLayoutParams();
-                layoutParams.gravity = Gravity.CENTER;
-                emptyView.setLayoutParams(layoutParams);
-                break;
-            } else if (parent instanceof CoordinatorLayout) {
-                parent.addView(emptyView);
-                CoordinatorLayout.LayoutParams layoutParams =
-                        (CoordinatorLayout.LayoutParams) emptyView.getLayoutParams();
                 layoutParams.gravity = Gravity.CENTER;
                 emptyView.setLayoutParams(layoutParams);
                 break;

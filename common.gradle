@@ -1,10 +1,11 @@
 android {
-    compileSdk 33
+    compileSdk 31
 
     defaultConfig {
-        minSdk 21
-        targetSdk 33
+        minSdk 19
+        targetSdk 30
 
+        multiDexEnabled true
         vectorDrawables.useSupportLibrary true
         vectorDrawables.generatedDensities = []
 
@@ -23,17 +24,16 @@ android {
     }
 
     packagingOptions {
-        resources {
-            excludes += ["META-INF/LICENSE.txt",
-                         "META-INF/NOTICE.txt",
-                         "META-INF/CHANGES",
-                         "META-INF/README.md"]
-        }
+        exclude "META-INF/LICENSE.txt"
+        exclude "META-INF/NOTICE.txt"
+        // Extraneous jsoup files
+        exclude "META-INF/CHANGES"
+        exclude "META-INF/README.md"
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     testOptions {
@@ -43,7 +43,7 @@ android {
         }
     }
 
-    lint {
+    lintOptions {
         disable "GradleDependency"
         checkDependencies true
         warningsAsErrors true

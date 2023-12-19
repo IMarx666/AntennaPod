@@ -4,37 +4,32 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.util.Log;
 import android.view.MenuItem;
 
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 
 import androidx.appcompat.app.ActionBar;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
 
 import com.bytehamster.lib.preferencesearch.SearchPreferenceResult;
 import com.bytehamster.lib.preferencesearch.SearchPreferenceResultListener;
 
-import com.google.android.material.snackbar.Snackbar;
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.core.preferences.ThemeSwitcher;
+import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.databinding.SettingsActivityBinding;
-import de.danoeh.antennapod.event.MessageEvent;
 import de.danoeh.antennapod.fragment.preferences.AutoDownloadPreferencesFragment;
 import de.danoeh.antennapod.fragment.preferences.ImportExportPreferencesFragment;
 import de.danoeh.antennapod.fragment.preferences.MainPreferencesFragment;
-import de.danoeh.antennapod.fragment.preferences.DownloadsPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.NetworkPreferencesFragment;
 import de.danoeh.antennapod.fragment.preferences.NotificationPreferencesFragment;
 import de.danoeh.antennapod.fragment.preferences.PlaybackPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.StoragePreferencesFragment;
 import de.danoeh.antennapod.fragment.preferences.synchronization.SynchronizationPreferencesFragment;
 import de.danoeh.antennapod.fragment.preferences.SwipePreferencesFragment;
 import de.danoeh.antennapod.fragment.preferences.UserInterfacePreferencesFragment;
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 
 /**
  * PreferenceActivity for API 11+. In order to change the behavior of the preference UI, see
@@ -43,11 +38,10 @@ import org.greenrobot.eventbus.ThreadMode;
 public class PreferenceActivity extends AppCompatActivity implements SearchPreferenceResultListener {
     private static final String FRAGMENT_TAG = "tag_preferences";
     public static final String OPEN_AUTO_DOWNLOAD_SETTINGS = "OpenAutoDownloadSettings";
-    private SettingsActivityBinding binding;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        setTheme(ThemeSwitcher.getTheme(this));
+        setTheme(UserPreferences.getTheme());
         super.onCreate(savedInstanceState);
 
         ActionBar ab = getSupportActionBar();
@@ -55,12 +49,12 @@ public class PreferenceActivity extends AppCompatActivity implements SearchPrefe
             ab.setDisplayHomeAsUpEnabled(true);
         }
 
-        binding = SettingsActivityBinding.inflate(getLayoutInflater());
+        final SettingsActivityBinding binding = SettingsActivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
         if (getSupportFragmentManager().findFragmentByTag(FRAGMENT_TAG) == null) {
             getSupportFragmentManager().beginTransaction()
-                    .replace(binding.settingsContainer.getId(), new MainPreferencesFragment(), FRAGMENT_TAG)
+                    .replace(R.id.settingsContainer, new MainPreferencesFragment(), FRAGMENT_TAG)
                     .commit();
         }
         Intent intent = getIntent();
@@ -74,8 +68,10 @@ public class PreferenceActivity extends AppCompatActivity implements SearchPrefe
 
         if (screen == R.xml.preferences_user_interface) {
             prefFragment = new UserInterfacePreferencesFragment();
-        } else if (screen == R.xml.preferences_downloads) {
-            prefFragment = new DownloadsPreferencesFragment();
+        } else if (screen == R.xml.preferences_network) {
+            prefFragment = new NetworkPreferencesFragment();
+        } else if (screen == R.xml.preferences_storage) {
+            prefFragment = new StoragePreferencesFragment();
         } else if (screen == R.xml.preferences_import_export) {
             prefFragment = new ImportExportPreferencesFragment();
         } else if (screen == R.xml.preferences_autodownload) {
@@ -93,12 +89,14 @@ public class PreferenceActivity extends AppCompatActivity implements SearchPrefe
     }
 
     public static int getTitleOfPage(int preferences) {
-        if (preferences == R.xml.preferences_downloads) {
-            return R.string.downloads_pref;
+        if (preferences == R.xml.preferences_network) {
+            return R.string.network_pref;
         } else if (preferences == R.xml.preferences_autodownload) {
             return R.string.pref_automatic_download_title;
         } else if (preferences == R.xml.preferences_playback) {
             return R.string.playback_pref;
+        } else if (preferences == R.xml.preferences_storage) {
+            return R.string.storage_pref;
         } else if (preferences == R.xml.preferences_import_export) {
             return R.string.import_export_pref;
         } else if (preferences == R.xml.preferences_user_interface) {
@@ -123,8 +121,7 @@ public class PreferenceActivity extends AppCompatActivity implements SearchPrefe
             intent.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
             startActivity(intent);
         } else {
-            getSupportFragmentManager().beginTransaction()
-                    .replace(binding.settingsContainer.getId(), fragment)
+            getSupportFragmentManager().beginTransaction().replace(R.id.settingsContainer, fragment)
                     .addToBackStack(getString(getTitleOfPage(screen))).commit();
         }
 
@@ -156,7 +153,7 @@ public class PreferenceActivity extends AppCompatActivity implements SearchPrefe
     public void onSearchResultClicked(SearchPreferenceResult result) {
         int screen = result.getResourceFile();
         if (screen == R.xml.feed_settings) {
-            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setTitle(R.string.feed_settings_label);
             builder.setMessage(R.string.pref_feed_settings_dialog_msg);
             builder.setPositiveButton(android.R.string.ok, null);
@@ -167,27 +164,5 @@ public class PreferenceActivity extends AppCompatActivity implements SearchPrefe
             PreferenceFragmentCompat fragment = openScreen(result.getResourceFile());
             result.highlight(fragment);
         }
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        EventBus.getDefault().register(this);
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        EventBus.getDefault().unregister(this);
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(MessageEvent event) {
-        Log.d(FRAGMENT_TAG, "onEvent(" + event + ")");
-        Snackbar s = Snackbar.make(binding.getRoot(), event.message, Snackbar.LENGTH_LONG);
-        if (event.action != null) {
-            s.setAction(event.actionText, v -> event.action.accept(this));
-        }
-        s.show();
     }
 }

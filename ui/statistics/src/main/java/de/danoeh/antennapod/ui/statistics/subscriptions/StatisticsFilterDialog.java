@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.widget.ArrayAdapter;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.util.Pair;
 import de.danoeh.antennapod.event.StatisticsEvent;
 import de.danoeh.antennapod.ui.statistics.R;
@@ -40,7 +40,7 @@ public class StatisticsFilterDialog {
     public void show() {
         StatisticsFilterDialogBinding dialogBinding = StatisticsFilterDialogBinding.inflate(
                 LayoutInflater.from(context));
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setView(dialogBinding.getRoot());
         builder.setTitle(R.string.filter);
         dialogBinding.includeMarkedCheckbox.setOnCheckedChangeListener((compoundButton, checked) -> {
@@ -107,10 +107,6 @@ public class StatisticsFilterDialog {
     private Pair<String[], Long[]> makeMonthlyList(long oldestDate, boolean inclusive) {
         Calendar date = Calendar.getInstance();
         date.setTimeInMillis(oldestDate);
-        date.set(Calendar.HOUR_OF_DAY, 0);
-        date.set(Calendar.MINUTE, 0);
-        date.set(Calendar.SECOND, 0);
-        date.set(Calendar.MILLISECOND, 0);
         date.set(Calendar.DAY_OF_MONTH, 1);
         ArrayList<String> names = new ArrayList<>();
         ArrayList<Long> timestamps = new ArrayList<>();

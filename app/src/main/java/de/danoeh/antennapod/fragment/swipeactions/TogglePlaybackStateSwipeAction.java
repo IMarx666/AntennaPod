@@ -39,10 +39,6 @@ public class TogglePlaybackStateSwipeAction implements SwipeAction {
 
     @Override
     public boolean willRemove(FeedItemFilter filter, FeedItem item) {
-        if (item.getPlayState() == FeedItem.NEW) {
-            return filter.showPlayed || filter.showNew;
-        } else {
-            return filter.showUnplayed || filter.showPlayed || filter.showNew;
-        }
+        return filter.showUnplayed || filter.showPlayed || filter.showNew;
     }
 }

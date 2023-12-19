@@ -3,13 +3,13 @@ package de.danoeh.antennapod.dialog;
 import android.content.Context;
 import android.view.View;
 import android.widget.EditText;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.appcompat.app.AlertDialog;
 import de.danoeh.antennapod.R;
 
 /**
  * Displays a dialog with a username and password text field and an optional checkbox to save username and preferences.
  */
-public abstract class FeedPreferenceSkipDialog extends MaterialAlertDialogBuilder {
+public abstract class FeedPreferenceSkipDialog extends AlertDialog.Builder {
 
     public FeedPreferenceSkipDialog(Context context, int skipIntroInitialValue,
                                     int skipEndInitialValue) {

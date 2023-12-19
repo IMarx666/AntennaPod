@@ -6,7 +6,6 @@ import android.graphics.Paint;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
-import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
 
 public class ChapterSeekBar extends androidx.appcompat.widget.AppCompatSeekBar {
@@ -43,9 +42,11 @@ public class ChapterSeekBar extends androidx.appcompat.widget.AppCompatSeekBar {
         dividerPos = null;
         density = context.getResources().getDisplayMetrics().density;
 
-        paintBackground.setColor(ThemeUtils.getColorFromAttr(getContext(), R.attr.colorSurfaceVariant));
+        paintBackground.setColor(ThemeUtils.getColorFromAttr(getContext(),
+                de.danoeh.antennapod.core.R.attr.currently_playing_background));
         paintBackground.setAlpha(128);
-        paintProgressPrimary.setColor(ThemeUtils.getColorFromAttr(getContext(), R.attr.colorPrimary));
+        paintProgressPrimary.setColor(ThemeUtils.getColorFromAttr(getContext(),
+                de.danoeh.antennapod.core.R.attr.colorPrimary));
     }
 
     /**

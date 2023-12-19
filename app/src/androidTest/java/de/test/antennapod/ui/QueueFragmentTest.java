@@ -33,7 +33,7 @@ public class QueueFragmentTest {
     public void setUp() {
         EspressoTestUtils.clearPreferences();
         EspressoTestUtils.clearDatabase();
-        EspressoTestUtils.setLaunchScreen(QueueFragment.TAG);
+        EspressoTestUtils.setLastNavFragment(QueueFragment.TAG);
         activityRule.launchActivity(new Intent());
     }
 

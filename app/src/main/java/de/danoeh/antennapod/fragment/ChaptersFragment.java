@@ -1,39 +1,38 @@
 package de.danoeh.antennapod.fragment;
 
 import android.app.Dialog;
-import android.content.DialogInterface;
 import android.os.Bundle;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ProgressBar;
-import android.widget.Toast;
+import android.widget.RelativeLayout;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatDialogFragment;
-import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
+import de.danoeh.antennapod.playback.base.PlayerStatus;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.adapter.ChaptersListAdapter;
+import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
 import de.danoeh.antennapod.core.util.ChapterUtils;
 import de.danoeh.antennapod.core.util.playback.PlaybackController;
-import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
 import de.danoeh.antennapod.model.feed.Chapter;
-import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.playback.Playable;
-import de.danoeh.antennapod.playback.base.PlayerStatus;
 import io.reactivex.Maybe;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 
 public class ChaptersFragment extends AppCompatDialogFragment {
     public static final String TAG = "ChaptersFragment";
@@ -48,21 +47,11 @@ public class ChaptersFragment extends AppCompatDialogFragment {
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-
-        AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext())
+        return new AlertDialog.Builder(requireContext())
                 .setTitle(getString(R.string.chapters_label))
                 .setView(onCreateView(getLayoutInflater()))
-                .setPositiveButton(getString(R.string.close_label), null) //dismisses
-                .setNeutralButton(getString(R.string.refresh_label), null)
+                .setNegativeButton(getString(R.string.cancel_label), null) //dismisses
                 .create();
-        dialog.show();
-        dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setVisibility(View.INVISIBLE);
-        dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener(v -> {
-            progressBar.setVisibility(View.VISIBLE);
-            loadMediaInfo(true);
-        });
-
-        return dialog;
     }
 
 
@@ -87,9 +76,9 @@ public class ChaptersFragment extends AppCompatDialogFragment {
         recyclerView.setAdapter(adapter);
 
         progressBar.setVisibility(View.VISIBLE);
-
-        CoordinatorLayout.LayoutParams wrapHeight = new CoordinatorLayout.LayoutParams(
-                CoordinatorLayout.LayoutParams.MATCH_PARENT, CoordinatorLayout.LayoutParams.WRAP_CONTENT);
+        
+        RelativeLayout.LayoutParams wrapHeight = new RelativeLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         recyclerView.setLayoutParams(wrapHeight);
 
         return root;
@@ -101,12 +90,17 @@ public class ChaptersFragment extends AppCompatDialogFragment {
         controller = new PlaybackController(getActivity()) {
             @Override
             public void loadMediaInfo() {
-                ChaptersFragment.this.loadMediaInfo(false);
+                ChaptersFragment.this.loadMediaInfo();
+            }
+
+            @Override
+            public void onPositionObserverUpdate() {
+                adapter.notifyDataSetChanged();
             }
         };
         controller.init();
         EventBus.getDefault().register(this);
-        loadMediaInfo(false);
+        loadMediaInfo();
     }
 
     @Override
@@ -134,14 +128,14 @@ public class ChaptersFragment extends AppCompatDialogFragment {
         return ChapterUtils.getCurrentChapterIndex(media, controller.getPosition());
     }
 
-    private void loadMediaInfo(boolean forceRefresh) {
+    private void loadMediaInfo() {
         if (disposable != null) {
             disposable.dispose();
         }
         disposable = Maybe.create(emitter -> {
             Playable media = controller.getMedia();
             if (media != null) {
-                ChapterUtils.loadChapters(media, getContext(), forceRefresh);
+                ChapterUtils.loadChapters(media, getContext());
                 emitter.onSuccess(media);
             } else {
                 emitter.onComplete();
@@ -159,18 +153,12 @@ public class ChaptersFragment extends AppCompatDialogFragment {
         if (adapter == null) {
             return;
         }
-        if (media.getChapters() != null && media.getChapters().size() == 0) {
+        if (media.getChapters() != null && media.getChapters().size() <= 0) {
             dismiss();
-            Toast.makeText(getContext(), R.string.no_chapters_label, Toast.LENGTH_LONG).show();
         } else {
             progressBar.setVisibility(View.GONE);
         }
         adapter.setMedia(media);
-        ((AlertDialog) getDialog()).getButton(DialogInterface.BUTTON_NEUTRAL).setVisibility(View.INVISIBLE);
-        if (media instanceof FeedMedia && ((FeedMedia) media).getItem() != null
-                && !TextUtils.isEmpty(((FeedMedia) media).getItem().getPodcastIndexChapterUrl())) {
-            ((AlertDialog) getDialog()).getButton(DialogInterface.BUTTON_NEUTRAL).setVisibility(View.VISIBLE);
-        }
         int positionOfCurrentChapter = getCurrentChapter(media);
         updateChapterSelection(positionOfCurrentChapter, true);
     }
