@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.ContextMenu;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,7 +14,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.adapter.HorizontalFeedListAdapter;
-import de.danoeh.antennapod.core.menuhandler.MenuItemUtils;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
 import de.danoeh.antennapod.fragment.SubscriptionFragment;
@@ -46,14 +44,7 @@ public class SubscriptionsSection extends HomeSection {
         final View view = super.onCreateView(inflater, container, savedInstanceState);
         viewBinding.recyclerView.setLayoutManager(
                 new LinearLayoutManager(getActivity(), RecyclerView.HORIZONTAL, false));
-        listAdapter = new HorizontalFeedListAdapter((MainActivity) getActivity()) {
-            @Override
-            public void onCreateContextMenu(ContextMenu contextMenu, View view,
-                                            ContextMenu.ContextMenuInfo contextMenuInfo) {
-                super.onCreateContextMenu(contextMenu, view, contextMenuInfo);
-                MenuItemUtils.setOnClickListeners(contextMenu, SubscriptionsSection.this::onContextItemSelected);
-            }
-        };
+        listAdapter = new HorizontalFeedListAdapter((MainActivity) getActivity());
         listAdapter.setDummyViews(NUM_FEEDS);
         viewBinding.recyclerView.setAdapter(listAdapter);
         int paddingHorizontal = (int) (12 * getResources().getDisplayMetrics().density);

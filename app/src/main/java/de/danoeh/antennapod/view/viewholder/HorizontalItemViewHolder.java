@@ -14,12 +14,13 @@ import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.adapter.CoverLoader;
 import de.danoeh.antennapod.adapter.actionbutton.ItemActionButton;
 import de.danoeh.antennapod.core.feed.util.ImageResourceUtils;
+import de.danoeh.antennapod.net.download.serviceinterface.DownloadRequest;
+import de.danoeh.antennapod.core.service.download.DownloadService;
 import de.danoeh.antennapod.core.util.DateFormatter;
 import de.danoeh.antennapod.core.util.PlaybackStatus;
 import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
-import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.ui.common.CircularProgressBar;
 import de.danoeh.antennapod.ui.common.SquareImageView;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
@@ -65,7 +66,6 @@ public class HorizontalItemViewHolder extends RecyclerView.ViewHolder {
                 .load();
         title.setText(item.getTitle());
         date.setText(DateFormatter.formatAbbrev(activity, item.getPubDate()));
-        date.setContentDescription(DateFormatter.formatForAccessibility(item.getPubDate()));
         ItemActionButton actionButton = ItemActionButton.forItem(item);
         actionButton.configure(secondaryActionIcon, secondaryActionIcon, activity);
         secondaryActionIcon.setFocusable(false);
@@ -85,17 +85,14 @@ public class HorizontalItemViewHolder extends RecyclerView.ViewHolder {
                 setProgressBar(false, 0);
             }
 
-            if (DownloadServiceInterface.get().isDownloadingEpisode(media.getDownload_url())) {
-                float percent = 0.01f * DownloadServiceInterface.get().getProgress(media.getDownload_url());
+            if (DownloadService.isDownloadingFile(media.getDownload_url())) {
+                final DownloadRequest downloadRequest = DownloadService.findRequest(media.getDownload_url());
+                float percent = 0.01f * downloadRequest.getProgressPercent();
                 circularProgressBar.setPercentage(Math.max(percent, 0.01f), item);
-                circularProgressBar.setIndeterminate(
-                        DownloadServiceInterface.get().isEpisodeQueued(media.getDownload_url()));
             } else if (media.isDownloaded()) {
                 circularProgressBar.setPercentage(1, item); // Do not animate 100% -> 0%
-                circularProgressBar.setIndeterminate(false);
             } else {
                 circularProgressBar.setPercentage(0, item); // Animate X% -> 0%
-                circularProgressBar.setIndeterminate(false);
             }
         }
     }
@@ -110,7 +107,6 @@ public class HorizontalItemViewHolder extends RecyclerView.ViewHolder {
         date.setText("███");
         secondaryActionIcon.setImageDrawable(null);
         circularProgressBar.setPercentage(0, null);
-        circularProgressBar.setIndeterminate(false);
         setProgressBar(true, 50);
     }
 

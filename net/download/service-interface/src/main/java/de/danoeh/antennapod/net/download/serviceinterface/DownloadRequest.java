@@ -14,6 +14,7 @@ import de.danoeh.antennapod.model.feed.FeedMedia;
 
 public class DownloadRequest implements Parcelable {
     public static final String REQUEST_ARG_PAGE_NR = "page";
+    public static final String REQUEST_ARG_LOAD_ALL_PAGES = "loadAllPages";
 
     private final String destination;
     private final String source;
@@ -21,6 +22,7 @@ public class DownloadRequest implements Parcelable {
     private String username;
     private String password;
     private String lastModified;
+    private final boolean deleteOnFailure;
     private final long feedfileId;
     private final int feedfileType;
     private final Bundle arguments;
@@ -33,26 +35,26 @@ public class DownloadRequest implements Parcelable {
     private boolean initiatedByUser;
 
     public DownloadRequest(@NonNull String destination, @NonNull String source, @NonNull String title, long feedfileId,
-                           int feedfileType, String username, String password,
+                           int feedfileType, String username, String password, boolean deleteOnFailure,
                            Bundle arguments, boolean initiatedByUser) {
-        this(destination, source, title, feedfileId, feedfileType, null, username, password, false,
-                arguments, initiatedByUser);
+        this(destination, source, title, feedfileId, feedfileType, null, deleteOnFailure, username, password, false,
+             arguments, initiatedByUser);
     }
 
     private DownloadRequest(Builder builder) {
         this(builder.destination, builder.source, builder.title, builder.feedfileId, builder.feedfileType,
-                builder.lastModified, builder.username, builder.password, false,
-                builder.arguments, builder.initiatedByUser);
+             builder.lastModified, builder.deleteOnFailure, builder.username, builder.password, false,
+             builder.arguments != null ? builder.arguments : new Bundle(), builder.initiatedByUser);
     }
 
     private DownloadRequest(Parcel in) {
         this(in.readString(), in.readString(), in.readString(), in.readLong(), in.readInt(), in.readString(),
-                nullIfEmpty(in.readString()), nullIfEmpty(in.readString()), in.readByte() > 0,
-                in.readBundle(), in.readByte() > 0);
+             in.readByte() > 0, nullIfEmpty(in.readString()), nullIfEmpty(in.readString()), in.readByte() > 0,
+             in.readBundle(), in.readByte() > 0);
     }
 
     private DownloadRequest(String destination, String source, String title, long feedfileId, int feedfileType,
-                            String lastModified, String username, String password,
+                            String lastModified, boolean deleteOnFailure, String username, String password,
                             boolean mediaEnqueued, Bundle arguments, boolean initiatedByUser) {
         this.destination = destination;
         this.source = source;
@@ -60,6 +62,7 @@ public class DownloadRequest implements Parcelable {
         this.feedfileId = feedfileId;
         this.feedfileType = feedfileType;
         this.lastModified = lastModified;
+        this.deleteOnFailure = deleteOnFailure;
         this.username = username;
         this.password = password;
         this.mediaEnqueued = mediaEnqueued;
@@ -80,6 +83,7 @@ public class DownloadRequest implements Parcelable {
         dest.writeLong(feedfileId);
         dest.writeInt(feedfileType);
         dest.writeString(lastModified);
+        dest.writeByte((deleteOnFailure) ? (byte) 1 : 0);
         // in case of null username/password, still write an empty string
         // (rather than skipping it). Otherwise, unmarshalling  a collection
         // of them from a Parcel (from an Intent extra to submit a request to DownloadService) will fail.
@@ -120,6 +124,7 @@ public class DownloadRequest implements Parcelable {
 
         if (lastModified != null ? !lastModified.equals(that.lastModified) : that.lastModified != null)
             return false;
+        if (deleteOnFailure != that.deleteOnFailure) return false;
         if (feedfileId != that.feedfileId) return false;
         if (feedfileType != that.feedfileType) return false;
         if (progressPercent != that.progressPercent) return false;
@@ -146,6 +151,7 @@ public class DownloadRequest implements Parcelable {
         result = 31 * result + (username != null ? username.hashCode() : 0);
         result = 31 * result + (password != null ? password.hashCode() : 0);
         result = 31 * result + (lastModified != null ? lastModified.hashCode() : 0);
+        result = 31 * result + (deleteOnFailure ? 1 : 0);
         result = 31 * result + (int) (feedfileId ^ (feedfileId >>> 32));
         result = 31 * result + feedfileType;
         result = 31 * result + arguments.hashCode();
@@ -231,17 +237,38 @@ public class DownloadRequest implements Parcelable {
         return lastModified;
     }
 
+    public boolean isDeleteOnFailure() {
+        return deleteOnFailure;
+    }
+
+    public boolean isMediaEnqueued() {
+        return mediaEnqueued;
+    }
+
+    public boolean isInitiatedByUser() {
+        return initiatedByUser;
+    }
+
+    /**
+     * Set to true if the media is enqueued because of this download.
+     * The state is helpful if the download is cancelled, and undoing the enqueue is needed.
+     */
+    public void setMediaEnqueued(boolean mediaEnqueued) {
+        this.mediaEnqueued = mediaEnqueued;
+    }
+
     public Bundle getArguments() {
         return arguments;
     }
 
     public static class Builder {
         private final String destination;
-        private String source;
+        private final String source;
         private final String title;
         private String username;
         private String password;
         private String lastModified;
+        private boolean deleteOnFailure = false;
         private final long feedfileId;
         private final int feedfileType;
         private final Bundle arguments = new Bundle();
@@ -269,14 +296,15 @@ public class DownloadRequest implements Parcelable {
             return this;
         }
 
-        public void setSource(String source) {
-            this.source = source;
-        }
-
         public void setForce(boolean force) {
             if (force) {
                 lastModified = null;
             }
+        }
+
+        public Builder deleteOnFailure(boolean deleteOnFailure) {
+            this.deleteOnFailure = deleteOnFailure;
+            return this;
         }
 
         public Builder lastModified(String lastModified) {
@@ -288,6 +316,12 @@ public class DownloadRequest implements Parcelable {
             this.username = username;
             this.password = password;
             return this;
+        }
+
+        public void loadAllPages(boolean loadAllPages) {
+            if (loadAllPages) {
+                arguments.putBoolean(REQUEST_ARG_LOAD_ALL_PAGES, true);
+            }
         }
 
         public DownloadRequest build() {

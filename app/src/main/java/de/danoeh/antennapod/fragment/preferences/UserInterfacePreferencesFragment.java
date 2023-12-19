@@ -5,19 +5,18 @@ import android.os.Build;
 import android.os.Bundle;
 import android.widget.ListView;
 import androidx.appcompat.app.AlertDialog;
-import androidx.core.app.ActivityCompat;
-import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.snackbar.Snackbar;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import androidx.core.app.ActivityCompat;
+import androidx.preference.PreferenceFragmentCompat;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.PreferenceActivity;
+import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.dialog.DrawerPreferencesDialog;
 import de.danoeh.antennapod.dialog.FeedSortDialog;
 import de.danoeh.antennapod.dialog.SubscriptionsFilterDialog;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.event.UnreadItemsUpdateEvent;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import org.greenrobot.eventbus.EventBus;
 
 import java.util.List;
@@ -38,16 +37,22 @@ public class UserInterfacePreferencesFragment extends PreferenceFragmentCompat {
     }
 
     private void setupInterfaceScreen() {
-        Preference.OnPreferenceChangeListener restartApp = (preference, newValue) -> {
-            ActivityCompat.recreate(getActivity());
-            return true;
-        };
-        findPreference(UserPreferences.PREF_THEME).setOnPreferenceChangeListener(restartApp);
-        findPreference(UserPreferences.PREF_THEME_BLACK).setOnPreferenceChangeListener(restartApp);
-        findPreference(UserPreferences.PREF_TINTED_COLORS).setOnPreferenceChangeListener(restartApp);
+        findPreference(UserPreferences.PREF_THEME)
+                .setOnPreferenceChangeListener(
+                        (preference, newValue) -> {
+                            ActivityCompat.recreate(getActivity());
+                            return true;
+                        });
+
         if (Build.VERSION.SDK_INT < 31) {
             findPreference(UserPreferences.PREF_TINTED_COLORS).setVisible(false);
         }
+        findPreference(UserPreferences.PREF_TINTED_COLORS)
+                .setOnPreferenceChangeListener(
+                        (preference, newValue) -> {
+                            ActivityCompat.recreate(getActivity());
+                            return true;
+                        });
 
         findPreference(UserPreferences.PREF_SHOW_TIME_LEFT)
                 .setOnPreferenceChangeListener(

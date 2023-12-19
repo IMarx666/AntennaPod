@@ -23,7 +23,6 @@ import de.danoeh.antennapod.net.sync.nextcloud.NextcloudLoginFlow;
 public class NextcloudAuthenticationFragment extends DialogFragment
         implements NextcloudLoginFlow.AuthenticationCallback {
     public static final String TAG = "NextcloudAuthenticationFragment";
-    private static final String EXTRA_LOGIN_FLOW = "LoginFlow";
     private NextcloudAuthDialogBinding viewBinding;
     private NextcloudLoginFlow nextcloudLoginFlow;
     private boolean shouldDismiss = false;
@@ -41,32 +40,15 @@ public class NextcloudAuthenticationFragment extends DialogFragment
         dialog.setView(viewBinding.getRoot());
 
         viewBinding.chooseHostButton.setOnClickListener(v -> {
+            viewBinding.errorText.setVisibility(View.GONE);
+            viewBinding.chooseHostButton.setVisibility(View.GONE);
+            viewBinding.loginProgressContainer.setVisibility(View.VISIBLE);
             nextcloudLoginFlow = new NextcloudLoginFlow(AntennapodHttpClient.getHttpClient(),
                     viewBinding.serverUrlText.getText().toString(), getContext(), this);
-            startLoginFlow();
+            nextcloudLoginFlow.start();
         });
-        if (savedInstanceState != null && savedInstanceState.getStringArrayList(EXTRA_LOGIN_FLOW) != null) {
-            nextcloudLoginFlow = NextcloudLoginFlow.fromInstanceState(AntennapodHttpClient.getHttpClient(),
-                    getContext(), this, savedInstanceState.getStringArrayList(EXTRA_LOGIN_FLOW));
-            startLoginFlow();
-        }
+
         return dialog.create();
-    }
-
-    private void startLoginFlow() {
-        viewBinding.errorText.setVisibility(View.GONE);
-        viewBinding.chooseHostButton.setVisibility(View.GONE);
-        viewBinding.loginProgressContainer.setVisibility(View.VISIBLE);
-        viewBinding.serverUrlText.setEnabled(false);
-        nextcloudLoginFlow.start();
-    }
-
-    @Override
-    public void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (nextcloudLoginFlow != null) {
-            outState.putStringArrayList(EXTRA_LOGIN_FLOW, nextcloudLoginFlow.saveInstanceState());
-        }
     }
 
     @Override
@@ -93,7 +75,7 @@ public class NextcloudAuthenticationFragment extends DialogFragment
         SynchronizationCredentials.setHosturl(server);
         SynchronizationCredentials.setUsername(username);
         SyncService.fullSync(getContext());
-        if (isResumed()) {
+        if (isVisible()) {
             dismiss();
         } else {
             shouldDismiss = true;
@@ -106,6 +88,5 @@ public class NextcloudAuthenticationFragment extends DialogFragment
         viewBinding.errorText.setVisibility(View.VISIBLE);
         viewBinding.errorText.setText(errorMessage);
         viewBinding.chooseHostButton.setVisibility(View.VISIBLE);
-        viewBinding.serverUrlText.setEnabled(true);
     }
 }

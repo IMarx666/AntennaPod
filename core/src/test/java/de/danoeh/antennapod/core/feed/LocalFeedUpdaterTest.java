@@ -26,7 +26,6 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.shadows.ShadowMediaMetadataRetriever;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -263,11 +262,7 @@ public class LocalFeedUpdaterTest {
 
             // call method to test
             Feed feed = new Feed(FEED_URL, null);
-            try {
-                LocalFeedUpdater.tryUpdateFeed(feed, context, null, null);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            LocalFeedUpdater.tryUpdateFeed(feed, context, null, null);
         }
     }
 

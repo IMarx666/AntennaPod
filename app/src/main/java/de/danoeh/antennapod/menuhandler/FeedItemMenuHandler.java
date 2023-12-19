@@ -12,12 +12,10 @@ import androidx.fragment.app.Fragment;
 
 import com.google.android.material.snackbar.Snackbar;
 
-import java.util.Arrays;
-
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.core.preferences.PlaybackPreferences;
-import de.danoeh.antennapod.core.util.FeedUtil;
+import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.core.receiver.MediaButtonReceiver;
 import de.danoeh.antennapod.core.service.playback.PlaybackServiceInterface;
 import de.danoeh.antennapod.core.storage.DBWriter;
@@ -31,7 +29,6 @@ import de.danoeh.antennapod.dialog.ShareDialog;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.net.sync.model.EpisodeAction;
-import de.danoeh.antennapod.view.LocalDeleteModal;
 
 /**
  * Handles interactions with the FeedItemMenu.
@@ -59,7 +56,6 @@ public class FeedItemMenuHandler {
         final boolean isPlaying = hasMedia && PlaybackStatus.isPlaying(selectedItem.getMedia());
         final boolean isInQueue = selectedItem.isTagged(FeedItem.TAG_QUEUE);
         final boolean fileDownloaded = hasMedia && selectedItem.getMedia().fileExists();
-        final boolean isLocalFile = hasMedia && selectedItem.getFeed().isLocalFeed();
         final boolean isFavorite = selectedItem.isTagged(FeedItem.TAG_FAVORITE);
 
         setItemVisibility(menu, R.id.skip_episode_item, isPlaying);
@@ -84,7 +80,7 @@ public class FeedItemMenuHandler {
 
         setItemVisibility(menu, R.id.add_to_favorites_item, !isFavorite);
         setItemVisibility(menu, R.id.remove_from_favorites_item, isFavorite);
-        setItemVisibility(menu, R.id.remove_item, fileDownloaded || isLocalFile);
+        setItemVisibility(menu, R.id.remove_item, fileDownloaded);
         return true;
     }
 
@@ -152,14 +148,13 @@ public class FeedItemMenuHandler {
         if (menuItemId == R.id.skip_episode_item) {
             context.sendBroadcast(MediaButtonReceiver.createIntent(context, KeyEvent.KEYCODE_MEDIA_NEXT));
         } else if (menuItemId == R.id.remove_item) {
-            LocalDeleteModal.showLocalFeedDeleteWarningIfNecessary(context, Arrays.asList(selectedItem),
-                    () -> DBWriter.deleteFeedMediaOfItem(context, selectedItem.getMedia().getId()));
+            DBWriter.deleteFeedMediaOfItem(context, selectedItem.getMedia().getId());
         } else if (menuItemId == R.id.remove_inbox_item) {
             removeNewFlagWithUndo(fragment, selectedItem);
         } else if (menuItemId == R.id.mark_read_item) {
             selectedItem.setPlayed(true);
             DBWriter.markItemPlayed(selectedItem, FeedItem.PLAYED, true);
-            if (!selectedItem.getFeed().isLocalFeed() && SynchronizationSettings.isProviderConnected()) {
+            if (SynchronizationSettings.isProviderConnected()) {
                 FeedMedia media = selectedItem.getMedia();
                 // not all items have media, Gpodder only cares about those that do
                 if (media != null) {
@@ -175,7 +170,7 @@ public class FeedItemMenuHandler {
         } else if (menuItemId == R.id.mark_unread_item) {
             selectedItem.setPlayed(false);
             DBWriter.markItemPlayed(selectedItem, FeedItem.UNPLAYED, false);
-            if (!selectedItem.getFeed().isLocalFeed() && selectedItem.getMedia() != null) {
+            if (selectedItem.getMedia() != null) {
                 EpisodeAction actionNew = new EpisodeAction.Builder(selectedItem, EpisodeAction.NEW)
                         .currentTimestamp()
                         .build();
@@ -230,8 +225,7 @@ public class FeedItemMenuHandler {
         final Handler h = new Handler(fragment.requireContext().getMainLooper());
         final Runnable r = () -> {
             FeedMedia media = item.getMedia();
-            boolean shouldAutoDelete = FeedUtil.shouldAutoDeleteItemsOnThatFeed(item.getFeed());
-            if (media != null && FeedItemUtil.hasAlmostEnded(media) && shouldAutoDelete) {
+            if (media != null && FeedItemUtil.hasAlmostEnded(media) && UserPreferences.isAutoDelete()) {
                 DBWriter.deleteFeedMediaOfItem(fragment.requireContext(), media.getId());
             }
         };

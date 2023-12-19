@@ -1,6 +1,5 @@
 package de.danoeh.antennapod.playback.cast;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import androidx.annotation.NonNull;
 import android.util.Log;
@@ -9,6 +8,8 @@ import android.view.SurfaceHolder;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.Nullable;
@@ -37,7 +38,6 @@ import org.greenrobot.eventbus.EventBus;
 /**
  * Implementation of PlaybackServiceMediaPlayer suitable for remote playback on Cast Devices.
  */
-@SuppressLint("VisibleForTests")
 public class CastPsmp extends PlaybackServiceMediaPlayer {
 
     public static final String TAG = "CastPSMP";
@@ -434,6 +434,16 @@ public class CastPsmp extends PlaybackServiceMediaPlayer {
     }
 
     @Override
+    public boolean canDownmix() {
+        return false;
+    }
+
+    @Override
+    public void setDownmix(boolean enable) {
+        throw new UnsupportedOperationException("Setting downmix unsupported in Remote Media Player");
+    }
+
+    @Override
     public MediaType getCurrentMediaType() {
         return mediaType;
     }
@@ -490,7 +500,7 @@ public class CastPsmp extends PlaybackServiceMediaPlayer {
     }
 
     @Override
-    protected void endPlayback(boolean hasEnded, boolean wasSkipped, boolean shouldContinue,
+    protected Future<?> endPlayback(boolean hasEnded, boolean wasSkipped, boolean shouldContinue,
                                     boolean toStoppedState) {
         Log.d(TAG, "endPlayback() called");
         boolean isPlaying = playerStatus == PlayerStatus.PLAYING;
@@ -537,6 +547,10 @@ public class CastPsmp extends PlaybackServiceMediaPlayer {
             callback.onPlaybackPause(currentMedia,
                     currentMedia != null ? currentMedia.getPosition() : Playable.INVALID_TIME);
         }
+
+        FutureTask<?> future = new FutureTask<>(() -> { }, null);
+        future.run();
+        return future;
     }
 
     @Override

@@ -6,15 +6,17 @@ import androidx.annotation.PluralsRes;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
+import de.danoeh.antennapod.net.download.serviceinterface.DownloadRequest;
+import de.danoeh.antennapod.core.service.download.DownloadRequestCreator;
 import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.core.util.LongList;
 import de.danoeh.antennapod.model.feed.FeedItem;
-import de.danoeh.antennapod.view.LocalDeleteModal;
 
 public class EpisodeMultiSelectActionHandler {
     private static final String TAG = "EpisodeSelectHandler";
@@ -42,7 +44,7 @@ public class EpisodeMultiSelectActionHandler {
         } else if (actionId == R.id.download_batch) {
             downloadChecked(items);
         } else if (actionId == R.id.delete_batch) {
-            LocalDeleteModal.showLocalFeedDeleteWarningIfNecessary(activity, items, () -> deleteChecked(items));
+            deleteChecked(items);
         } else {
             Log.e(TAG, "Unrecognized speed dial action item. Do nothing. id=" + actionId);
         }
@@ -91,12 +93,14 @@ public class EpisodeMultiSelectActionHandler {
 
     private void downloadChecked(List<FeedItem> items) {
         // download the check episodes in the same order as they are currently displayed
+        List<DownloadRequest> requests = new ArrayList<>();
         for (FeedItem episode : items) {
             if (episode.hasMedia() && !episode.getFeed().isLocalFeed()) {
-                DownloadServiceInterface.get().download(activity, episode);
+                requests.add(DownloadRequestCreator.create(episode.getMedia()).build());
             }
         }
-        showMessage(R.plurals.downloading_batch_label, items.size());
+        DownloadServiceInterface.get().download(activity, true, requests.toArray(new DownloadRequest[0]));
+        showMessage(R.plurals.downloading_batch_label, requests.size());
     }
 
     private void deleteChecked(List<FeedItem> items) {

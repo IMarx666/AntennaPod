@@ -4,10 +4,6 @@ plugins {
 apply from: "../../common.gradle"
 apply from: "../../playFlavor.gradle"
 
-android {
-    namespace "de.danoeh.antennapod.ui.glide"
-}
-
 dependencies {
     implementation project(":model")
     implementation project(":core")

@@ -6,17 +6,13 @@ import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.app.NotificationCompat;
 import androidx.preference.PreferenceManager;
-import de.danoeh.antennapod.model.download.ProxyConfig;
-import de.danoeh.antennapod.model.feed.FeedCounter;
-import de.danoeh.antennapod.model.feed.FeedPreferences;
-import de.danoeh.antennapod.model.feed.SortOrder;
-import de.danoeh.antennapod.model.feed.SubscriptionsFilter;
-import de.danoeh.antennapod.model.playback.MediaType;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 
@@ -31,6 +27,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import de.danoeh.antennapod.model.feed.FeedCounter;
+import de.danoeh.antennapod.model.playback.MediaType;
+import de.danoeh.antennapod.model.feed.SubscriptionsFilter;
+import de.danoeh.antennapod.model.download.ProxyConfig;
+import de.danoeh.antennapod.model.feed.SortOrder;
 
 /**
  * Provides access to preferences set by the user in the settings screen. A
@@ -45,7 +48,6 @@ public class UserPreferences {
 
     // User Interface
     public static final String PREF_THEME = "prefTheme";
-    public static final String PREF_THEME_BLACK = "prefThemeBlack";
     public static final String PREF_TINTED_COLORS = "prefTintedColors";
     public static final String PREF_HIDDEN_DRAWER_ITEMS = "prefHiddenDrawerItems";
     public static final String PREF_DRAWER_FEED_ORDER = "prefDrawerFeedOrder";
@@ -55,7 +57,9 @@ public class UserPreferences {
     public static final String PREF_SHOW_TIME_LEFT = "showTimeLeft";
     private static final String PREF_PERSISTENT_NOTIFICATION = "prefPersistNotify";
     public static final String PREF_COMPACT_NOTIFICATION_BUTTONS = "prefCompactNotificationButtons";
+    public static final String PREF_LOCKSCREEN_BACKGROUND = "prefLockscreenBackground";
     private static final String PREF_SHOW_DOWNLOAD_REPORT = "prefShowDownloadReport";
+    private static final String PREF_SHOW_AUTO_DOWNLOAD_REPORT = "prefShowAutoDownloadReport";
     public static final String PREF_DEFAULT_PAGE = "prefDefaultPage";
     public static final String PREF_FILTER_FEED = "prefSubscriptionsFilter";
     public static final String PREF_SUBSCRIPTION_TITLE = "prefSubscriptionTitle";
@@ -63,13 +67,6 @@ public class UserPreferences {
 
     public static final String PREF_QUEUE_KEEP_SORTED = "prefQueueKeepSorted";
     public static final String PREF_QUEUE_KEEP_SORTED_ORDER = "prefQueueKeepSortedOrder";
-    public static final String PREF_NEW_EPISODES_ACTION = "prefNewEpisodesAction";
-    private static final String PREF_DOWNLOADS_SORTED_ORDER = "prefDownloadSortedOrder";
-    private static final String PREF_INBOX_SORTED_ORDER = "prefInboxSortedOrder";
-
-    // Episode
-    public static final String PREF_SORT_ALL_EPISODES = "prefEpisodesSort";
-    public static final String PREF_FILTER_ALL_EPISODES = "prefEpisodesFilter";
 
     // Playback
     public static final String PREF_PAUSE_ON_HEADSET_DISCONNECT = "prefPauseOnHeadsetDisconnect";
@@ -81,7 +78,6 @@ public class UserPreferences {
     public static final String PREF_SKIP_KEEPS_EPISODE = "prefSkipKeepsEpisode";
     private static final String PREF_FAVORITE_KEEPS_EPISODE = "prefFavoriteKeepsEpisode";
     private static final String PREF_AUTO_DELETE = "prefAutoDelete";
-    private static final String PREF_AUTO_DELETE_LOCAL = "prefAutoDeleteLocal";
     public static final String PREF_SMART_MARK_AS_PLAYED_SECS = "prefSmartMarkAsPlayedSecs";
     private static final String PREF_PLAYBACK_SPEED_ARRAY = "prefPlaybackSpeedArray";
     public static final String PREF_PAUSE_PLAYBACK_FOR_FOCUS_LOSS = "prefPauseForFocusLoss";
@@ -94,6 +90,7 @@ public class UserPreferences {
     public static final String PREF_UPDATE_INTERVAL = "prefAutoUpdateIntervall";
     private static final String PREF_MOBILE_UPDATE = "prefMobileUpdateTypes";
     public static final String PREF_EPISODE_CLEANUP = "prefEpisodeCleanup";
+    public static final String PREF_PARALLEL_DOWNLOADS = "prefParallelDownloads";
     public static final String PREF_EPISODE_CACHE_SIZE = "prefEpisodeCacheSize";
     public static final String PREF_ENABLE_AUTODL = "prefEnableAutoDl";
     public static final String PREF_ENABLE_AUTODL_ON_BATTERY = "prefEnableAutoDownloadOnBattery";
@@ -111,8 +108,11 @@ public class UserPreferences {
     // Other
     private static final String PREF_DATA_FOLDER = "prefDataFolder";
     public static final String PREF_DELETE_REMOVES_FROM_QUEUE = "prefDeleteRemovesFromQueue";
+    public static final String PREF_USAGE_COUNTING_DATE = "prefUsageCounting";
 
     // Mediaplayer
+    public static final String PREF_MEDIA_PLAYER = "prefMediaPlayer";
+    public static final String PREF_MEDIA_PLAYER_EXOPLAYER = "exoplayer";
     private static final String PREF_PLAYBACK_SPEED = "prefPlaybackSpeed";
     private static final String PREF_VIDEO_PLAYBACK_SPEED = "prefVideoPlaybackSpeed";
     public static final String PREF_PLAYBACK_SKIP_SILENCE = "prefSkipSilence";
@@ -121,6 +121,7 @@ public class UserPreferences {
     private static final String PREF_QUEUE_LOCKED = "prefQueueLocked";
 
     // Experimental
+    private static final String PREF_STEREO_TO_MONO = "PrefStereoToMono";
     public static final int EPISODE_CLEANUP_QUEUE = -1;
     public static final int EPISODE_CLEANUP_NULL = -2;
     public static final int EPISODE_CLEANUP_EXCEPT_FAVORITE = -3;
@@ -157,33 +158,17 @@ public class UserPreferences {
         LIGHT, DARK, BLACK, SYSTEM
     }
 
-    public static void setTheme(ThemePreference theme) {
-        switch (theme) {
-            case LIGHT:
-                prefs.edit().putString(PREF_THEME, "0").apply();
-                break;
-            case DARK:
-                prefs.edit().putString(PREF_THEME, "1").apply();
-                break;
-            default:
-                prefs.edit().putString(PREF_THEME, "system").apply();
-                break;
-        }
-    }
-
     public static ThemePreference getTheme() {
         switch (prefs.getString(PREF_THEME, "system")) {
             case "0":
                 return ThemePreference.LIGHT;
             case "1":
                 return ThemePreference.DARK;
+            case "2":
+                return ThemePreference.BLACK;
             default:
                 return ThemePreference.SYSTEM;
         }
-    }
-
-    public static boolean getIsBlackTheme() {
-        return prefs.getBoolean(PREF_THEME_BLACK, false);
     }
 
     public static boolean getIsThemeColorTinted() {
@@ -294,18 +279,60 @@ public class UserPreferences {
     }
 
     /**
+     * Returns true if the lockscreen background should be set to the current episode's image
+     *
+     * @return {@code true} if the lockscreen background should be set, {@code false}  otherwise
+     */
+    public static boolean setLockscreenBackground() {
+        return prefs.getBoolean(PREF_LOCKSCREEN_BACKGROUND, true);
+    }
+
+    /**
+     * Returns true if download reports are shown
+     *
+     * @return {@code true} if download reports are shown, {@code false}  otherwise
+     */
+    public static boolean showDownloadReport() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            return true; // System handles notification preferences
+        }
+        return prefs.getBoolean(PREF_SHOW_DOWNLOAD_REPORT, true);
+    }
+
+    /**
      * Used for migration of the preference to system notification channels.
      */
     public static boolean getShowDownloadReportRaw() {
         return prefs.getBoolean(PREF_SHOW_DOWNLOAD_REPORT, true);
     }
 
+    public static boolean showAutoDownloadReport() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            return true; // System handles notification preferences
+        }
+        return prefs.getBoolean(PREF_SHOW_AUTO_DOWNLOAD_REPORT, false);
+    }
+
+    /**
+     * Used for migration of the preference to system notification channels.
+     */
+    public static boolean getShowAutoDownloadReportRaw() {
+        return prefs.getBoolean(PREF_SHOW_AUTO_DOWNLOAD_REPORT, false);
+    }
+
     public static boolean enqueueDownloadedEpisodes() {
         return prefs.getBoolean(PREF_ENQUEUE_DOWNLOADED, true);
     }
 
+    @VisibleForTesting
+    public static void setEnqueueDownloadedEpisodes(boolean enqueueDownloadedEpisodes) {
+        prefs.edit()
+                .putBoolean(PREF_ENQUEUE_DOWNLOADED, enqueueDownloadedEpisodes)
+                .apply();
+    }
+
     public enum EnqueueLocation {
-        BACK, FRONT, AFTER_CURRENTLY_PLAYING, RANDOM
+        BACK, FRONT, AFTER_CURRENTLY_PLAYING
     }
 
     @NonNull
@@ -371,10 +398,6 @@ public class UserPreferences {
         return prefs.getBoolean(PREF_AUTO_DELETE, false);
     }
 
-    public static boolean isAutoDeleteLocal() {
-        return prefs.getBoolean(PREF_AUTO_DELETE_LOCAL, false);
-    }
-
     public static int getSmartMarkAsPlayedSecs() {
         return Integer.parseInt(prefs.getString(PREF_SMART_MARK_AS_PLAYED_SECS, "30"));
     }
@@ -423,12 +446,34 @@ public class UserPreferences {
         return prefs.getBoolean(PREF_PAUSE_PLAYBACK_FOR_FOCUS_LOSS, true);
     }
 
+
+    /*
+     * Returns update interval in milliseconds; value 0 means that auto update is disabled
+     * or feeds are updated at a certain time of day
+     */
     public static long getUpdateInterval() {
-        return Integer.parseInt(prefs.getString(PREF_UPDATE_INTERVAL, "12"));
+        String updateInterval = prefs.getString(PREF_UPDATE_INTERVAL, "0");
+        if(!updateInterval.contains(":")) {
+            return readUpdateInterval(updateInterval);
+        } else {
+            return 0;
+        }
+    }
+
+    public static int[] getUpdateTimeOfDay() {
+        String datetime = prefs.getString(PREF_UPDATE_INTERVAL, "");
+        if(datetime.length() >= 3 && datetime.contains(":")) {
+            String[] parts = datetime.split(":");
+            int hourOfDay = Integer.parseInt(parts[0]);
+            int minute = Integer.parseInt(parts[1]);
+            return new int[] { hourOfDay, minute };
+        } else {
+            return new int[0];
+        }
     }
 
     public static boolean isAutoUpdateDisabled() {
-        return getUpdateInterval() == 0;
+        return prefs.getString(PREF_UPDATE_INTERVAL, "").equals("0");
     }
 
     private static boolean isAllowMobileFor(String type) {
@@ -440,10 +485,6 @@ public class UserPreferences {
 
     public static boolean isAllowMobileFeedRefresh() {
         return isAllowMobileFor("feed_refresh");
-    }
-
-    public static boolean isAllowMobileSync() {
-        return isAllowMobileFor("sync");
     }
 
     public static boolean isAllowMobileEpisodeDownload() {
@@ -495,8 +536,8 @@ public class UserPreferences {
         setAllowMobileFor("images", allow);
     }
 
-    public static void setAllowMobileSync(boolean allow) {
-        setAllowMobileFor("sync", allow);
+    public static int getParallelDownloads() {
+        return Integer.parseInt(prefs.getString(PREF_PARALLEL_DOWNLOADS, "4"));
     }
 
     /**
@@ -626,6 +667,24 @@ public class UserPreferences {
              .apply();
     }
 
+    public static void setUpdateInterval(long hours) {
+        prefs.edit()
+             .putString(PREF_UPDATE_INTERVAL, String.valueOf(hours))
+             .apply();
+    }
+
+    public static void setUpdateTimeOfDay(int hourOfDay, int minute) {
+        prefs.edit()
+             .putString(PREF_UPDATE_INTERVAL, hourOfDay + ":" + minute)
+             .apply();
+    }
+
+    public static void disableAutoUpdate() {
+        prefs.edit()
+                .putString(PREF_UPDATE_INTERVAL, "0")
+                .apply();
+    }
+
     public static boolean gpodnetNotificationsEnabled() {
         if (Build.VERSION.SDK_INT >= 26) {
             return true; // System handles notification preferences
@@ -666,6 +725,11 @@ public class UserPreferences {
              .apply();
     }
 
+    private static long readUpdateInterval(String valueFromPrefs) {
+        int hours = Integer.parseInt(valueFromPrefs);
+        return TimeUnit.HOURS.toMillis(hours);
+    }
+
     private static List<Float> readPlaybackSpeedArray(String valueFromPrefs) {
         if (valueFromPrefs != null) {
             try {
@@ -682,6 +746,32 @@ public class UserPreferences {
         }
         // If this preference hasn't been set yet, return the default options
         return Arrays.asList(1.0f, 1.25f, 1.5f);
+    }
+
+    public static String getMediaPlayer() {
+        return prefs.getString(PREF_MEDIA_PLAYER, PREF_MEDIA_PLAYER_EXOPLAYER);
+    }
+
+    public static boolean useSonic() {
+        return getMediaPlayer().equals("sonic");
+    }
+
+    public static boolean useExoplayer() {
+        return getMediaPlayer().equals(PREF_MEDIA_PLAYER_EXOPLAYER);
+    }
+
+    public static void enableExoplayer() {
+        prefs.edit().putString(PREF_MEDIA_PLAYER, PREF_MEDIA_PLAYER_EXOPLAYER).apply();
+    }
+
+    public static boolean stereoToMono() {
+        return prefs.getBoolean(PREF_STEREO_TO_MONO, false);
+    }
+
+    public static void stereoToMono(boolean enable) {
+        prefs.edit()
+                .putBoolean(PREF_STEREO_TO_MONO, enable)
+                .apply();
     }
 
     public static int getEpisodeCleanupValue() {
@@ -758,6 +848,15 @@ public class UserPreferences {
         }
     }
 
+    /**
+     *
+     * @return true if auto update is set to a specific time
+     *         false if auto update is set to interval
+     */
+    public static boolean isAutoUpdateTimeOfDay() {
+        return getUpdateTimeOfDay().length == 2;
+    }
+
     public static String getDefaultPage() {
         return prefs.getString(PREF_DEFAULT_PAGE, "HomeFragment");
     }
@@ -827,36 +926,6 @@ public class UserPreferences {
                 .apply();
     }
 
-    public static FeedPreferences.NewEpisodesAction getNewEpisodesAction() {
-        String str = prefs.getString(PREF_NEW_EPISODES_ACTION,
-                "" + FeedPreferences.NewEpisodesAction.ADD_TO_INBOX.code);
-        return FeedPreferences.NewEpisodesAction.fromCode(Integer.parseInt(str));
-    }
-
-    /**
-     * Returns the sort order for the downloads.
-     */
-    public static SortOrder getDownloadsSortedOrder() {
-        String sortOrderStr = prefs.getString(PREF_DOWNLOADS_SORTED_ORDER, "" + SortOrder.DATE_NEW_OLD.code);
-        return SortOrder.fromCodeString(sortOrderStr);
-    }
-
-    /**
-     * Sets the sort order for the downloads.
-     */
-    public static void setDownloadsSortedOrder(SortOrder sortOrder) {
-        prefs.edit().putString(PREF_DOWNLOADS_SORTED_ORDER, "" + sortOrder.code).apply();
-    }
-
-    public static SortOrder getInboxSortedOrder() {
-        String sortOrderStr = prefs.getString(PREF_INBOX_SORTED_ORDER, "" + SortOrder.DATE_NEW_OLD.code);
-        return SortOrder.fromCodeString(sortOrderStr);
-    }
-
-    public static void setInboxSortedOrder(SortOrder sortOrder) {
-        prefs.edit().putString(PREF_INBOX_SORTED_ORDER, "" + sortOrder.code).apply();
-    }
-
     public static SubscriptionsFilter getSubscriptionsFilter() {
         String value = prefs.getString(PREF_FILTER_FEED, "");
         return new SubscriptionsFilter(value);
@@ -870,22 +939,5 @@ public class UserPreferences {
 
     public static boolean shouldShowSubscriptionTitle() {
         return prefs.getBoolean(PREF_SUBSCRIPTION_TITLE, false);
-    }
-
-    public static void setAllEpisodesSortOrder(SortOrder s) {
-        prefs.edit().putString(PREF_SORT_ALL_EPISODES, "" + s.code).apply();
-    }
-
-    public static SortOrder getAllEpisodesSortOrder() {
-        return SortOrder.fromCodeString(prefs.getString(PREF_SORT_ALL_EPISODES,
-                "" + SortOrder.DATE_NEW_OLD.code));
-    }
-
-    public static String getPrefFilterAllEpisodes() {
-        return prefs.getString(PREF_FILTER_ALL_EPISODES, "");
-    }
-
-    public static void setPrefFilterAllEpisodes(String filter) {
-        prefs.edit().putString(PREF_FILTER_ALL_EPISODES, filter).apply();
     }
 }

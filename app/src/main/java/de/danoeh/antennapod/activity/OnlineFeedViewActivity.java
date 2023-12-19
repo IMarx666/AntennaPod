@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,21 +31,20 @@ import com.google.android.material.snackbar.Snackbar;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.adapter.FeedItemlistDescriptionAdapter;
+import de.danoeh.antennapod.core.event.DownloadEvent;
 import de.danoeh.antennapod.core.preferences.ThemeSwitcher;
+import de.danoeh.antennapod.core.service.download.DownloadService;
 import de.danoeh.antennapod.core.service.download.DownloadRequestCreator;
 import de.danoeh.antennapod.core.feed.FeedUrlNotFoundException;
-import de.danoeh.antennapod.core.storage.DBTasks;
+import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.core.service.playback.PlaybackServiceInterface;
 import de.danoeh.antennapod.core.util.DownloadErrorLabel;
-import de.danoeh.antennapod.databinding.OnlinefeedviewHeaderBinding;
-import de.danoeh.antennapod.event.EpisodeDownloadEvent;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.core.preferences.PlaybackPreferences;
-import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.net.download.serviceinterface.DownloadRequest;
-import de.danoeh.antennapod.model.download.DownloadResult;
+import de.danoeh.antennapod.model.download.DownloadStatus;
 import de.danoeh.antennapod.core.service.download.Downloader;
 import de.danoeh.antennapod.core.service.download.HttpDownloader;
 import de.danoeh.antennapod.core.storage.DBReader;
@@ -100,7 +100,6 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
     private static final String TAG = "OnlineFeedViewActivity";
     private static final String PREFS = "OnlineFeedViewActivityPreferences";
     private static final String PREF_LAST_AUTO_DOWNLOAD = "lastAutoDownload";
-    private static final int DESCRIPTION_MAX_LINES_COLLAPSED = 4;
 
     private volatile List<Feed> feeds;
     private String selectedDownloadUrl;
@@ -118,7 +117,6 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
     private Disposable parser;
     private Disposable updater;
 
-    private OnlinefeedviewHeaderBinding headerBinding;
     private OnlinefeedviewActivityBinding viewBinding;
 
     @Override
@@ -130,10 +128,8 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
         setContentView(viewBinding.getRoot());
 
         viewBinding.transparentBackground.setOnClickListener(v -> finish());
-        viewBinding.closeButton.setOnClickListener(view -> finish());
         viewBinding.card.setOnClickListener(null);
         viewBinding.card.setCardBackgroundColor(ThemeUtils.getColorFromAttr(this, R.attr.colorSurface));
-        headerBinding = OnlinefeedviewHeaderBinding.inflate(getLayoutInflater());
 
         String feedUrl = null;
         if (getIntent().hasExtra(ARG_FEEDURL)) {
@@ -311,7 +307,10 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
                 error -> Log.e(TAG, Log.getStackTraceString(error)));
     }
 
-    private void checkDownloadResult(@NonNull DownloadResult status, String destination) {
+    private void checkDownloadResult(@NonNull DownloadStatus status, String destination) {
+        if (status.isCancelled()) {
+            return;
+        }
         if (status.isSuccessful()) {
             parseFeed(destination);
         } else if (status.getReason() == DownloadError.ERROR_UNAUTHORIZED) {
@@ -342,8 +341,9 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
                 );
     }
 
-    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(EpisodeDownloadEvent event) {
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onEventMainThread(DownloadEvent event) {
+        Log.d(TAG, "onEventMainThread() called with: " + "event = [" + event + "]");
         handleUpdatedFeedStatus();
     }
 
@@ -420,9 +420,13 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
 
         viewBinding.backgroundImage.setColorFilter(new LightingColorFilter(0xff828282, 0x000000));
 
-        viewBinding.listView.addHeaderView(headerBinding.getRoot());
+        View header = View.inflate(this, R.layout.onlinefeedview_header, null);
+
+        viewBinding.listView.addHeaderView(header);
         viewBinding.listView.setSelector(android.R.color.transparent);
         viewBinding.listView.setAdapter(new FeedItemlistDescriptionAdapter(this, 0, feed.getItems()));
+
+        TextView description = header.findViewById(R.id.txtvDescription);
 
         if (StringUtils.isNotBlank(feed.getImageUrl())) {
             Glide.with(this)
@@ -445,13 +449,16 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
 
         viewBinding.titleLabel.setText(feed.getTitle());
         viewBinding.authorLabel.setText(feed.getAuthor());
-        headerBinding.txtvDescription.setText(HtmlToPlainText.getPlainText(feed.getDescription()));
+        description.setText(HtmlToPlainText.getPlainText(feed.getDescription()));
 
         viewBinding.subscribeButton.setOnClickListener(v -> {
             if (feedInFeedlist()) {
                 openFeed();
             } else {
-                DBTasks.updateFeed(this, feed, false);
+                Feed f = new Feed(selectedDownloadUrl, null, feed.getTitle());
+                DownloadServiceInterface.get().download(this, false, DownloadRequestCreator.create(f)
+                        .withAuthentication(username, password)
+                        .build());
                 didPressSubscribe = true;
                 handleUpdatedFeedStatus();
             }
@@ -467,12 +474,13 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
             viewBinding.autoDownloadCheckBox.setChecked(preferences.getBoolean(PREF_LAST_AUTO_DOWNLOAD, true));
         }
 
-        headerBinding.txtvDescription.setMaxLines(DESCRIPTION_MAX_LINES_COLLAPSED);
-        headerBinding.txtvDescription.setOnClickListener(v -> {
-            if (headerBinding.txtvDescription.getMaxLines() > DESCRIPTION_MAX_LINES_COLLAPSED) {
-                headerBinding.txtvDescription.setMaxLines(DESCRIPTION_MAX_LINES_COLLAPSED);
+        final int MAX_LINES_COLLAPSED = 10;
+        description.setMaxLines(MAX_LINES_COLLAPSED);
+        description.setOnClickListener(v -> {
+            if (description.getMaxLines() > MAX_LINES_COLLAPSED) {
+                description.setMaxLines(MAX_LINES_COLLAPSED);
             } else {
-                headerBinding.txtvDescription.setMaxLines(2000);
+                description.setMaxLines(2000);
             }
         });
 
@@ -530,7 +538,7 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
     }
 
     private void handleUpdatedFeedStatus() {
-        if (DownloadServiceInterface.get().isDownloadingEpisode(selectedDownloadUrl)) {
+        if (DownloadService.isDownloadingFile(selectedDownloadUrl)) {
             viewBinding.subscribeButton.setEnabled(false);
             viewBinding.subscribeButton.setText(R.string.subscribing_label);
         } else if (feedInFeedlist()) {
@@ -538,24 +546,19 @@ public class OnlineFeedViewActivity extends AppCompatActivity {
             viewBinding.subscribeButton.setText(R.string.open_podcast);
             if (didPressSubscribe) {
                 didPressSubscribe = false;
-
-                Feed feed1 = DBReader.getFeed(getFeedId());
-                FeedPreferences feedPreferences = feed1.getPreferences();
                 if (UserPreferences.isEnableAutodownload()) {
                     boolean autoDownload = viewBinding.autoDownloadCheckBox.isChecked();
+
+                    Feed feed1 = DBReader.getFeed(getFeedId());
+                    FeedPreferences feedPreferences = feed1.getPreferences();
                     feedPreferences.setAutoDownload(autoDownload);
+                    DBWriter.setFeedPreferences(feedPreferences);
 
                     SharedPreferences preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
                     SharedPreferences.Editor editor = preferences.edit();
                     editor.putBoolean(PREF_LAST_AUTO_DOWNLOAD, autoDownload);
                     editor.apply();
                 }
-                if (username != null) {
-                    feedPreferences.setUsername(username);
-                    feedPreferences.setPassword(password);
-                }
-                DBWriter.setFeedPreferences(feedPreferences);
-
                 openFeed();
             }
         } else {

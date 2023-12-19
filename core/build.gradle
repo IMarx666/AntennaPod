@@ -5,9 +5,7 @@ apply from: "../common.gradle"
 apply from: "../playFlavor.gradle"
 
 android {
-    namespace "de.danoeh.antennapod.core"
-
-    lint {
+    lintOptions {
         disable "InvalidPeriodicWorkRequestInterval", "ObsoleteLintCustomCheck", "DefaultLocale", "UnusedAttribute",
                 "ParcelClassLoader", "CheckResult", "TrustAllX509TrustManager",
                 "StaticFieldLeak", "IconDensities", "IconDuplicates"
@@ -64,11 +62,11 @@ dependencies {
     annotationProcessor "org.greenrobot:eventbus-annotation-processor:$eventbusVersion"
     implementation "io.reactivex.rxjava2:rxandroid:$rxAndroidVersion"
     implementation "io.reactivex.rxjava2:rxjava:$rxJavaVersion"
-    implementation "com.annimon:stream:$annimonStreamVersion"
 
     implementation "com.google.android.exoplayer:exoplayer-core:$exoPlayerVersion"
     implementation "com.google.android.exoplayer:exoplayer-ui:$exoPlayerVersion"
     implementation "com.google.android.exoplayer:extension-okhttp:$exoPlayerVersion"
+    implementation "com.github.AntennaPod:AntennaPod-AudioPlayer:$audioPlayerVersion"
 
     // Non-free dependencies:
     playApi "com.google.android.support:wearable:$wearableSupportVersion"

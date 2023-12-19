@@ -27,13 +27,15 @@ import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.adapter.EpisodeItemListAdapter;
 import de.danoeh.antennapod.core.dialog.ConfirmationDialog;
+import de.danoeh.antennapod.core.event.DownloadEvent;
+import de.danoeh.antennapod.core.event.DownloaderUpdate;
 import de.danoeh.antennapod.core.menuhandler.MenuItemUtils;
+import de.danoeh.antennapod.core.service.download.DownloadService;
+import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.util.FeedItemUtil;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
-import de.danoeh.antennapod.event.EpisodeDownloadEvent;
+import de.danoeh.antennapod.core.util.download.AutoUpdateManager;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
-import de.danoeh.antennapod.event.FeedUpdateRunningEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.event.UnreadItemsUpdateEvent;
 import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
@@ -122,7 +124,7 @@ public abstract class EpisodesListFragment extends Fragment
         }
         final int itemId = item.getItemId();
         if (itemId == R.id.refresh_item) {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             return true;
         } else if (itemId == R.id.action_search) {
             ((MainActivity) getActivity()).loadChildFragment(SearchFragment.newInstance());
@@ -183,7 +185,7 @@ public abstract class EpisodesListFragment extends Fragment
         SwipeRefreshLayout swipeRefreshLayout = root.findViewById(R.id.swipeRefresh);
         swipeRefreshLayout.setDistanceToTriggerSync(getResources().getInteger(R.integer.swipe_refresh_distance));
         swipeRefreshLayout.setOnRefreshListener(() -> {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             new Handler(Looper.getMainLooper()).postDelayed(() -> swipeRefreshLayout.setRefreshing(false),
                     getResources().getInteger(R.integer.swipe_to_refresh_duration_in_ms));
         });
@@ -386,11 +388,16 @@ public abstract class EpisodesListFragment extends Fragment
     }
 
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(EpisodeDownloadEvent event) {
-        for (String downloadUrl : event.getUrls()) {
-            int pos = FeedItemUtil.indexOfItemWithDownloadUrl(episodes, downloadUrl);
-            if (pos >= 0) {
-                listAdapter.notifyItemChangedCompat(pos);
+    public void onEventMainThread(DownloadEvent event) {
+        Log.d(TAG, "onEventMainThread() called with: " + "event = [" + event + "]");
+        DownloaderUpdate update = event.update;
+        updateToolbar();
+        if (update.mediaIds.length > 0) {
+            for (long mediaId : update.mediaIds) {
+                int pos = FeedItemUtil.indexOfItemWithMediaId(episodes, mediaId);
+                if (pos >= 0) {
+                    listAdapter.notifyItemChangedCompat(pos);
+                }
             }
         }
     }
@@ -438,12 +445,18 @@ public abstract class EpisodesListFragment extends Fragment
     }
 
     @NonNull
-    protected abstract List<FeedItem> loadData();
+    protected List<FeedItem> loadData() {
+        return DBReader.getRecentlyPublishedEpisodes(0, page * EPISODES_PER_PAGE, getFilter());
+    }
 
     @NonNull
-    protected abstract List<FeedItem> loadMoreData(int page);
+    protected List<FeedItem> loadMoreData(int page) {
+        return DBReader.getRecentlyPublishedEpisodes((page - 1) * EPISODES_PER_PAGE, EPISODES_PER_PAGE, getFilter());
+    }
 
-    protected abstract int loadTotalItemCount();
+    protected int loadTotalItemCount() {
+        return DBReader.getTotalEpisodeCount(getFilter());
+    }
 
     protected abstract FeedItemFilter getFilter();
 
@@ -452,12 +465,9 @@ public abstract class EpisodesListFragment extends Fragment
     protected abstract String getPrefName();
 
     protected void updateToolbar() {
-    }
-
-    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(FeedUpdateRunningEvent event) {
         if (toolbar.getMenu().findItem(R.id.refresh_item) != null) {
-            MenuItemUtils.updateRefreshMenuItem(toolbar.getMenu(), R.id.refresh_item, event.isFeedUpdateRunning);
+            MenuItemUtils.updateRefreshMenuItem(toolbar.getMenu(), R.id.refresh_item,
+                    DownloadService.isRunning && DownloadService.isDownloadingFeeds());
         }
     }
 

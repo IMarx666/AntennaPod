@@ -7,7 +7,6 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.LightingColorFilter;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -22,24 +21,25 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import androidx.appcompat.content.res.AppCompatResources;
+import com.google.android.material.appbar.MaterialToolbar;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.appbar.CollapsingToolbarLayout;
-import com.google.android.material.appbar.MaterialToolbar;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.snackbar.Snackbar;
+import com.joanzapata.iconify.Iconify;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.storage.DBTasks;
 import de.danoeh.antennapod.core.util.IntentUtils;
-import de.danoeh.antennapod.core.util.ShareUtils;
 import de.danoeh.antennapod.core.util.syndication.HtmlToPlainText;
 import de.danoeh.antennapod.dialog.EditUrlSettingsDialog;
+import de.danoeh.antennapod.menuhandler.FeedMenuHandler;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedFunding;
 import de.danoeh.antennapod.ui.glide.FastBlurTransformation;
@@ -98,10 +98,7 @@ public class FeedInfoFragment extends Fragment implements MaterialToolbar.OnMenu
                 android.content.ClipboardManager cm = (android.content.ClipboardManager) getContext()
                         .getSystemService(Context.CLIPBOARD_SERVICE);
                 cm.setPrimaryClip(clipData);
-                if (Build.VERSION.SDK_INT <= 32) {
-                    ((MainActivity) getActivity()).showSnackbarAbovePlayer(R.string.copied_to_clipboard,
-                            Snackbar.LENGTH_SHORT);
-                }
+                ((MainActivity) getActivity()).showSnackbarAbovePlayer(R.string.copied_url_msg, Snackbar.LENGTH_SHORT);
             }
         }
     };
@@ -199,7 +196,7 @@ public class FeedInfoFragment extends Fragment implements MaterialToolbar.OnMenu
         Log.d(TAG, "Language is " + feed.getLanguage());
         Log.d(TAG, "Author is " + feed.getAuthor());
         Log.d(TAG, "URL is " + feed.getDownload_url());
-        Glide.with(this)
+        Glide.with(getContext())
                 .load(feed.getImageUrl())
                 .apply(new RequestOptions()
                         .placeholder(R.color.light_gray)
@@ -207,7 +204,7 @@ public class FeedInfoFragment extends Fragment implements MaterialToolbar.OnMenu
                         .fitCenter()
                         .dontAnimate())
                 .into(imgvCover);
-        Glide.with(this)
+        Glide.with(getContext())
                 .load(feed.getImageUrl())
                 .apply(new RequestOptions()
                         .placeholder(R.color.image_readability_tint)
@@ -227,8 +224,7 @@ public class FeedInfoFragment extends Fragment implements MaterialToolbar.OnMenu
             txtvAuthorHeader.setText(feed.getAuthor());
         }
 
-        txtvUrl.setText(feed.getDownload_url());
-        txtvUrl.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_paperclip, 0);
+        txtvUrl.setText(feed.getDownload_url() + " {fa-paperclip}");
 
         if (feed.getPaymentLinks() == null || feed.getPaymentLinks().size() == 0) {
             lblSupport.setVisibility(View.GONE);
@@ -263,6 +259,7 @@ public class FeedInfoFragment extends Fragment implements MaterialToolbar.OnMenu
             txtvFundingUrl.setText(str.toString());
         }
 
+        Iconify.addIcons(txtvUrl);
         refreshToolbarState();
     }
 
@@ -289,11 +286,9 @@ public class FeedInfoFragment extends Fragment implements MaterialToolbar.OnMenu
                     R.string.please_wait_for_data, Toast.LENGTH_LONG);
             return false;
         }
-        if (item.getItemId() == R.id.visit_website_item) {
-            IntentUtils.openInBrowser(getContext(), feed.getLink());
-        } else if (item.getItemId() == R.id.share_item) {
-            ShareUtils.shareFeedLink(getContext(), feed);
-        } else if (item.getItemId() == R.id.reconnect_local_folder) {
+        boolean handled = FeedMenuHandler.onOptionsItemClicked(getContext(), item, feed);
+
+        if (item.getItemId() == R.id.reconnect_local_folder) {
             MaterialAlertDialogBuilder alert = new MaterialAlertDialogBuilder(getContext());
             alert.setMessage(R.string.reconnect_local_folder_warning);
             alert.setPositiveButton(android.R.string.ok, (dialog, which) -> {
@@ -305,19 +300,23 @@ public class FeedInfoFragment extends Fragment implements MaterialToolbar.OnMenu
             });
             alert.setNegativeButton(android.R.string.cancel, null);
             alert.show();
-        } else if (item.getItemId() == R.id.edit_feed_url_item) {
+            return true;
+        }
+
+        if (item.getItemId() == R.id.edit_feed_url_item) {
             new EditUrlSettingsDialog(getActivity(), feed) {
                 @Override
                 protected void setUrl(String url) {
                     feed.setDownload_url(url);
-                    txtvUrl.setText(feed.getDownload_url());
-                    txtvUrl.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_paperclip, 0);
+                    txtvUrl.setText(feed.getDownload_url() + " {fa-paperclip}");
+                    Iconify.addIcons(txtvUrl);
                 }
             }.show();
-        } else {
-            return false;
+
+            return true;
         }
-        return true;
+
+        return handled;
     }
 
     private void addLocalFolderResult(final Uri uri) {

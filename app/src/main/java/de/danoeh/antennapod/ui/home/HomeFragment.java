@@ -1,10 +1,7 @@
 package de.danoeh.antennapod.ui.home;
 
-import android.Manifest;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,35 +11,20 @@ import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentContainerView;
-
-import de.danoeh.antennapod.ui.echo.EchoActivity;
-import de.danoeh.antennapod.ui.home.sections.EchoSection;
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.List;
-
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
+import de.danoeh.antennapod.core.event.DownloadEvent;
 import de.danoeh.antennapod.core.menuhandler.MenuItemUtils;
+import de.danoeh.antennapod.core.service.download.DownloadService;
 import de.danoeh.antennapod.core.storage.DBReader;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
+import de.danoeh.antennapod.core.util.download.AutoUpdateManager;
 import de.danoeh.antennapod.databinding.HomeFragmentBinding;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
-import de.danoeh.antennapod.event.FeedUpdateRunningEvent;
 import de.danoeh.antennapod.fragment.SearchFragment;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
-import de.danoeh.antennapod.ui.home.sections.AllowNotificationsSection;
 import de.danoeh.antennapod.ui.home.sections.DownloadsSection;
 import de.danoeh.antennapod.ui.home.sections.EpisodesSurpriseSection;
 import de.danoeh.antennapod.ui.home.sections.InboxSection;
@@ -53,6 +35,13 @@ import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Shows unread or recently published episodes
@@ -62,8 +51,6 @@ public class HomeFragment extends Fragment implements Toolbar.OnMenuItemClickLis
     public static final String TAG = "HomeFragment";
     public static final String PREF_NAME = "PrefHomeFragment";
     public static final String PREF_HIDDEN_SECTIONS = "PrefHomeSectionsString";
-    public static final String PREF_DISABLE_NOTIFICATION_PERMISSION_NAG = "DisableNotificationPermissionNag";
-    public static final String PREF_HIDE_ECHO = "HideEcho";
 
     private static final String KEY_UP_ARROW = "up_arrow";
     private boolean displayUpArrow;
@@ -82,12 +69,13 @@ public class HomeFragment extends Fragment implements Toolbar.OnMenuItemClickLis
         }
         viewBinding.homeScrollView.setOnScrollChangeListener(new LiftOnScrollListener(viewBinding.appbar));
         ((MainActivity) requireActivity()).setupToolbarToggle(viewBinding.toolbar, displayUpArrow);
+        refreshToolbarState();
         populateSectionList();
         updateWelcomeScreenVisibility();
 
         viewBinding.swipeRefresh.setDistanceToTriggerSync(getResources().getInteger(R.integer.swipe_refresh_distance));
         viewBinding.swipeRefresh.setOnRefreshListener(() -> {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             new Handler(Looper.getMainLooper()).postDelayed(() -> viewBinding.swipeRefresh.setRefreshing(false),
                     getResources().getInteger(R.integer.swipe_to_refresh_duration_in_ms));
         });
@@ -97,20 +85,6 @@ public class HomeFragment extends Fragment implements Toolbar.OnMenuItemClickLis
 
     private void populateSectionList() {
         viewBinding.homeContainer.removeAllViews();
-
-        SharedPreferences prefs = getContext().getSharedPreferences(HomeFragment.PREF_NAME, Context.MODE_PRIVATE);
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(getContext(),
-                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            if (!prefs.getBoolean(HomeFragment.PREF_DISABLE_NOTIFICATION_PERMISSION_NAG, false)) {
-                addSection(new AllowNotificationsSection());
-            }
-        }
-        if (Calendar.getInstance().get(Calendar.YEAR) == EchoActivity.RELEASE_YEAR
-                && Calendar.getInstance().get(Calendar.MONTH) == Calendar.DECEMBER
-                && Calendar.getInstance().get(Calendar.DAY_OF_MONTH) >= 10
-                && prefs.getInt(PREF_HIDE_ECHO, 0) != EchoActivity.RELEASE_YEAR) {
-            addSection(new EchoSection());
-        }
 
         List<String> hiddenSections = getHiddenSections(getContext());
         String[] sectionTags = getResources().getStringArray(R.array.home_section_tags);
@@ -152,10 +126,14 @@ public class HomeFragment extends Fragment implements Toolbar.OnMenuItemClickLis
         return new ArrayList<>(Arrays.asList(TextUtils.split(hiddenSectionsString, ",")));
     }
 
-    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(FeedUpdateRunningEvent event) {
+    private void refreshToolbarState() {
         MenuItemUtils.updateRefreshMenuItem(viewBinding.toolbar.getMenu(),
-                R.id.refresh_item, event.isFeedUpdateRunning);
+                R.id.refresh_item, DownloadService.isRunning && DownloadService.isDownloadingFeeds());
+    }
+
+    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
+    public void onEventMainThread(DownloadEvent event) {
+        refreshToolbarState();
     }
 
     @Override
@@ -164,7 +142,7 @@ public class HomeFragment extends Fragment implements Toolbar.OnMenuItemClickLis
             HomeSectionsSettingsDialog.open(getContext(), (dialogInterface, i) -> populateSectionList());
             return true;
         } else if (item.getItemId() == R.id.refresh_item) {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             return true;
         } else if (item.getItemId() == R.id.action_search) {
             ((MainActivity) getActivity()).loadChildFragment(SearchFragment.newInstance());
@@ -200,8 +178,7 @@ public class HomeFragment extends Fragment implements Toolbar.OnMenuItemClickLis
         if (disposable != null) {
             disposable.dispose();
         }
-        disposable = Observable.fromCallable(() ->
-                        DBReader.getNavDrawerData(UserPreferences.getSubscriptionsFilter()).items.size())
+        disposable = Observable.fromCallable(() -> DBReader.getNavDrawerData().items.size())
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(numSubscriptions -> {

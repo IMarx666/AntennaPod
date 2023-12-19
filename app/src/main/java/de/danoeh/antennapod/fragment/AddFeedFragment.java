@@ -27,7 +27,6 @@ import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.activity.OnlineFeedViewActivity;
 import de.danoeh.antennapod.activity.OpmlImportActivity;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.core.storage.DBTasks;
 import de.danoeh.antennapod.model.feed.SortOrder;
@@ -197,8 +196,8 @@ public class AddFeedFragment extends Fragment {
     }
 
     private Feed addLocalFolder(Uri uri) {
-        getActivity().getContentResolver().takePersistableUriPermission(uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        getActivity().getContentResolver()
+                .takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
         DocumentFile documentFile = DocumentFile.fromTreeUri(getContext(), uri);
         if (documentFile == null) {
             throw new IllegalArgumentException("Unable to retrieve document tree");
@@ -211,7 +210,7 @@ public class AddFeedFragment extends Fragment {
         dirFeed.setItems(Collections.emptyList());
         dirFeed.setSortOrder(SortOrder.EPISODE_TITLE_A_Z);
         Feed fromDatabase = DBTasks.updateFeed(getContext(), dirFeed, false);
-        FeedUpdateManager.runOnce(requireContext(), fromDatabase);
+        DBTasks.forceRefreshFeed(getContext(), fromDatabase, true);
         return fromDatabase;
     }
 

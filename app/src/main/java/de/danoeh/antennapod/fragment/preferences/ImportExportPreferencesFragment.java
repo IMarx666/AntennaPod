@@ -147,7 +147,7 @@ public class ImportExportPreferencesFragment extends PreferenceFragmentCompat {
                     .subscribe(output -> {
                         Uri fileUri = FileProvider.getUriForFile(context.getApplicationContext(),
                                 context.getString(R.string.provider_authority), output);
-                        showExportSuccessSnackbar(fileUri, exportType.contentType);
+                        showExportSuccessDialog(output.toString(), fileUri, exportType);
                     }, this::showExportErrorDialog, progressDialog::dismiss);
         } else {
             DocumentFileExportWorker worker = new DocumentFileExportWorker(exportWriter, context, uri);
@@ -155,7 +155,7 @@ public class ImportExportPreferencesFragment extends PreferenceFragmentCompat {
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(output ->
-                            showExportSuccessSnackbar(output.getUri(), exportType.contentType),
+                            showExportSuccessDialog(output.getUri().toString(), output.getUri(), exportType),
                             this::showExportErrorDialog, progressDialog::dismiss);
         }
     }
@@ -191,15 +191,20 @@ public class ImportExportPreferencesFragment extends PreferenceFragmentCompat {
         builder.show();
     }
 
-    void showExportSuccessSnackbar(Uri uri, String mimeType) {
-        Snackbar.make(getView(), R.string.export_success_title, Snackbar.LENGTH_LONG)
-                .setAction(R.string.share_label, v ->
-                        new ShareCompat.IntentBuilder(getContext())
-                                .setType(mimeType)
-                                .addStream(uri)
-                                .setChooserTitle(R.string.share_label)
-                                .startChooser())
-                .show();
+    private void showExportSuccessDialog(String path, Uri streamUri, Export exportType) {
+        final MaterialAlertDialogBuilder alert = new MaterialAlertDialogBuilder(getContext());
+        alert.setNeutralButton(android.R.string.ok, (dialog, which) -> dialog.dismiss());
+        alert.setTitle(R.string.export_success_title);
+        alert.setMessage(getContext().getString(R.string.export_success_sum, path));
+        alert.setPositiveButton(R.string.send_label, (dialog, which) -> {
+            new ShareCompat.IntentBuilder(getContext())
+                    .setType(exportType.contentType)
+                    .setSubject(getString(exportType.labelResId))
+                    .addStream(streamUri)
+                    .setChooserTitle(R.string.send_label)
+                    .startChooser();
+        });
+        alert.create().show();
     }
 
     private void showExportErrorDialog(final Throwable error) {
@@ -259,7 +264,7 @@ public class ImportExportPreferencesFragment extends PreferenceFragmentCompat {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
-                    showExportSuccessSnackbar(uri, "application/x-sqlite3");
+                    Snackbar.make(getView(), R.string.export_success_title, Snackbar.LENGTH_LONG).show();
                     progressDialog.dismiss();
                 }, this::showExportErrorDialog);
     }

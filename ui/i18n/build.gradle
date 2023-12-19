@@ -4,9 +4,7 @@ plugins {
 apply from: "../../common.gradle"
 
 android {
-    namespace "de.danoeh.antennapod.ui.i18n"
-
-    lint {
+    lintOptions {
         disable "Typos", "ExtraTranslation", "ImpliedQuantity",
                 "PluralsCandidate", "UnusedQuantity", "TypographyEllipsis"
     }

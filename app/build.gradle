@@ -1,19 +1,17 @@
 plugins {
     id('com.android.application')
-    id('com.github.triplet.play') version '3.8.3' apply false
+    id('com.github.triplet.play') version '3.7.0-agp4.2' apply false
 }
 apply from: "../common.gradle"
 apply from: "../playFlavor.gradle"
 
 android {
-    namespace "de.danoeh.antennapod"
-
     defaultConfig {
         // Version code schema:
         // "1.2.3-beta4"    -> 1020304
         // "1.2.3"          -> 1020395
-        versionCode 3020095
-        versionName "3.2.0"
+        versionCode 3000295
+        versionName "3.0.2"
 
         def commit = ""
         try {
@@ -58,18 +56,22 @@ android {
         }
     }
 
-    lint {
+    lintOptions {
         disable 'ObsoleteLintCustomCheck', 'CheckResult', 'UnusedAttribute', 'BatteryLife', 'InflateParams',
                 'RestrictedApi', 'TrustAllX509TrustManager', 'ExportedReceiver', 'AllowBackup', 'VectorDrawableCompat',
                 'StaticFieldLeak', 'UseCompoundDrawables', 'NestedWeights', 'Overdraw', 'UselessParent', 'TextFields',
                 'AlwaysShowAction', 'Autofill', 'ClickableViewAccessibility', 'ContentDescription',
                 'KeyboardInaccessibleWidget', 'LabelFor', 'SetTextI18n', 'HardcodedText', 'RelativeOverlap',
                 'RtlCompat', 'RtlHardcoded', 'MissingMediaBrowserServiceIntentFilter', 'VectorPath',
-                'InvalidPeriodicWorkRequestInterval', 'NotifyDataSetChanged', 'RtlEnabled'
+                'InvalidPeriodicWorkRequestInterval'
     }
 
-    androidResources {
+    aaptOptions {
         additionalParameters "--no-version-vectors"
+    }
+
+    dexOptions {
+        jumboMode true
     }
 }
 
@@ -89,7 +91,6 @@ dependencies {
     implementation project(':storage:preferences')
     implementation project(':ui:app-start-intent')
     implementation project(':ui:common')
-    implementation project(':ui:echo')
     implementation project(':ui:glide')
     implementation project(':ui:i18n')
     implementation project(':ui:statistics')
@@ -101,6 +102,7 @@ dependencies {
     implementation "androidx.fragment:fragment:$fragmentVersion"
     implementation 'androidx.gridlayout:gridlayout:1.0.0'
     implementation "androidx.media:media:$mediaVersion"
+    implementation 'androidx.multidex:multidex:2.0.1'
     implementation "androidx.palette:palette:$paletteVersion"
     implementation "androidx.preference:preference:$preferenceVersion"
     implementation "androidx.recyclerview:recyclerview:$recyclerViewVersion"
@@ -123,10 +125,11 @@ dependencies {
     implementation "com.joanzapata.iconify:android-iconify-fontawesome:$iconifyVersion"
     implementation "com.joanzapata.iconify:android-iconify-material:$iconifyVersion"
     implementation 'com.leinardi.android:speed-dial:3.2.0'
+    implementation "com.github.AntennaPod:AntennaPod-AudioPlayer:$audioPlayerVersion"
     implementation 'com.github.ByteHamster:SearchPreference:v2.0.0'
-    implementation 'com.github.skydoves:balloon:1.5.3'
+    implementation 'com.github.skydoves:balloon:1.4.0'
     implementation 'com.github.xabaras:RecyclerViewSwipeDecorator:1.3'
-    implementation "com.annimon:stream:$annimonStreamVersion"
+    implementation 'com.annimon:stream:1.2.2'
 
     // Non-free dependencies:
     playImplementation 'com.google.android.play:core:1.8.0'

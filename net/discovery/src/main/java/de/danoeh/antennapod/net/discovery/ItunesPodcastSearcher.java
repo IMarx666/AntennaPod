@@ -111,6 +111,6 @@ public class ItunesPodcastSearcher implements PodcastSearcher {
 
     @Override
     public String getName() {
-        return "Apple";
+        return "iTunes";
     }
 }

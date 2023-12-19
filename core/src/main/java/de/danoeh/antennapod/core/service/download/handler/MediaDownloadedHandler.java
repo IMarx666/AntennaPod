@@ -6,7 +6,6 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import de.danoeh.antennapod.model.MediaMetadataRetrieverCompat;
 import org.greenrobot.eventbus.EventBus;
 
 import java.io.File;
@@ -14,7 +13,7 @@ import java.util.concurrent.ExecutionException;
 
 import de.danoeh.antennapod.event.UnreadItemsUpdateEvent;
 import de.danoeh.antennapod.net.download.serviceinterface.DownloadRequest;
-import de.danoeh.antennapod.model.download.DownloadResult;
+import de.danoeh.antennapod.model.download.DownloadStatus;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.core.sync.queue.SynchronizationQueueSink;
@@ -31,9 +30,9 @@ public class MediaDownloadedHandler implements Runnable {
     private static final String TAG = "MediaDownloadedHandler";
     private final DownloadRequest request;
     private final Context context;
-    private DownloadResult updatedStatus;
+    private DownloadStatus updatedStatus;
 
-    public MediaDownloadedHandler(@NonNull Context context, @NonNull DownloadResult status,
+    public MediaDownloadedHandler(@NonNull Context context, @NonNull DownloadStatus status,
                                   @NonNull DownloadRequest request) {
         this.request = request;
         this.context = context;
@@ -63,8 +62,9 @@ public class MediaDownloadedHandler implements Runnable {
             ChapterUtils.loadChaptersFromUrl(media.getItem().getPodcastIndexChapterUrl(), false);
         }
         // Get duration
+        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
         String durationStr = null;
-        try (MediaMetadataRetrieverCompat mmr = new MediaMetadataRetrieverCompat()) {
+        try {
             mmr.setDataSource(media.getFile_url());
             durationStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
             media.setDuration(Integer.parseInt(durationStr));
@@ -73,6 +73,8 @@ public class MediaDownloadedHandler implements Runnable {
             Log.d(TAG, "Invalid file duration: " + durationStr);
         } catch (Exception e) {
             Log.e(TAG, "Get duration failed", e);
+        } finally {
+            mmr.release();
         }
 
         final FeedItem item = media.getItem();
@@ -95,8 +97,8 @@ public class MediaDownloadedHandler implements Runnable {
             Log.e(TAG, "MediaHandlerThread was interrupted");
         } catch (ExecutionException e) {
             Log.e(TAG, "ExecutionException in MediaHandlerThread: " + e.getMessage());
-            updatedStatus = new DownloadResult(media, media.getEpisodeTitle(),
-                    DownloadError.ERROR_DB_ACCESS_ERROR, false, e.getMessage());
+            updatedStatus = new DownloadStatus(media, media.getEpisodeTitle(),
+                    DownloadError.ERROR_DB_ACCESS_ERROR, false, e.getMessage(), request.isInitiatedByUser());
         }
 
         if (item != null) {
@@ -108,7 +110,7 @@ public class MediaDownloadedHandler implements Runnable {
     }
 
     @NonNull
-    public DownloadResult getUpdatedStatus() {
+    public DownloadStatus getUpdatedStatus() {
         return updatedStatus;
     }
 }

@@ -1,35 +1,29 @@
 package de.danoeh.antennapod.fragment;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.dialog.AllEpisodesFilterDialog;
-import de.danoeh.antennapod.dialog.ItemSortDialog;
-import de.danoeh.antennapod.event.FeedListUpdateEvent;
-import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
-import de.danoeh.antennapod.model.feed.SortOrder;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import org.apache.commons.lang3.StringUtils;
-import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 
 /**
  * Shows all episodes (possibly filtered by user).
  */
 public class AllEpisodesFragment extends EpisodesListFragment {
     public static final String TAG = "EpisodesFragment";
-    public static final String PREF_NAME = "PrefAllEpisodesFragment";
+    private static final String PREF_NAME = "PrefAllEpisodesFragment";
+    private static final String PREF_FILTER = "filter";
 
     @NonNull
     @Override
@@ -44,28 +38,10 @@ public class AllEpisodesFragment extends EpisodesListFragment {
         return root;
     }
 
-    @NonNull
-    @Override
-    protected List<FeedItem> loadData() {
-        return DBReader.getEpisodes(0, page * EPISODES_PER_PAGE, getFilter(),
-                UserPreferences.getAllEpisodesSortOrder());
-    }
-
-    @NonNull
-    @Override
-    protected List<FeedItem> loadMoreData(int page) {
-        return DBReader.getEpisodes((page - 1) * EPISODES_PER_PAGE, EPISODES_PER_PAGE, getFilter(),
-                UserPreferences.getAllEpisodesSortOrder());
-    }
-
-    @Override
-    protected int loadTotalItemCount() {
-        return DBReader.getTotalEpisodeCount(getFilter());
-    }
-
     @Override
     protected FeedItemFilter getFilter() {
-        return new FeedItemFilter(UserPreferences.getPrefFilterAllEpisodes());
+        SharedPreferences prefs = getActivity().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        return new FeedItemFilter(prefs.getString(PREF_FILTER, ""));
     }
 
     @Override
@@ -95,16 +71,14 @@ public class AllEpisodesFragment extends EpisodesListFragment {
             }
             onFilterChanged(new AllEpisodesFilterDialog.AllEpisodesFilterChangedEvent(new HashSet<>(filter)));
             return true;
-        } else if (item.getItemId() == R.id.episodes_sort) {
-            new AllEpisodesSortDialog().show(getChildFragmentManager().beginTransaction(), "SortDialog");
-            return true;
         }
         return false;
     }
 
     @Subscribe
     public void onFilterChanged(AllEpisodesFilterDialog.AllEpisodesFilterChangedEvent event) {
-        UserPreferences.setPrefFilterAllEpisodes(StringUtils.join(event.filterValues, ","));
+        SharedPreferences prefs = getActivity().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString(PREF_FILTER, StringUtils.join(event.filterValues, ",")).apply();
         updateFilterUi();
         page = 1;
         loadItems();
@@ -121,27 +95,5 @@ public class AllEpisodesFragment extends EpisodesListFragment {
         }
         toolbar.getMenu().findItem(R.id.action_favorites).setIcon(
                 getFilter().showIsFavorite ? R.drawable.ic_star : R.drawable.ic_star_border);
-    }
-
-    public static class AllEpisodesSortDialog extends ItemSortDialog {
-        @Override
-        public void onCreate(@Nullable Bundle savedInstanceState) {
-            super.onCreate(savedInstanceState);
-            sortOrder = UserPreferences.getAllEpisodesSortOrder();
-        }
-
-        @Override
-        protected void onAddItem(int title, SortOrder ascending, SortOrder descending, boolean ascendingIsDefault) {
-            if (ascending == SortOrder.DATE_OLD_NEW || ascending == SortOrder.DURATION_SHORT_LONG) {
-                super.onAddItem(title, ascending, descending, ascendingIsDefault);
-            }
-        }
-
-        @Override
-        protected void onSelectionChanged() {
-            super.onSelectionChanged();
-            UserPreferences.setAllEpisodesSortOrder(sortOrder);
-            EventBus.getDefault().post(new FeedListUpdateEvent(0));
-        }
     }
 }

@@ -294,7 +294,6 @@ public class PlaybackServiceTaskManager {
         public void run() {
             Log.d(TAG, "Starting");
             long lastTick = System.currentTimeMillis();
-            EventBus.getDefault().post(SleepTimerUpdatedEvent.updated(timeLeft));
             while (timeLeft > 0) {
                 try {
                     Thread.sleep(UPDATE_INTERVAL);

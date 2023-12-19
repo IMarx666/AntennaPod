@@ -203,9 +203,9 @@ public class ExternalPlayerFragment extends Fragment {
                 .fitCenter()
                 .dontAnimate();
 
-        Glide.with(this)
+        Glide.with(getActivity())
                 .load(ImageResourceUtils.getEpisodeListImageLocation(media))
-                .error(Glide.with(this)
+                .error(Glide.with(getActivity())
                         .load(ImageResourceUtils.getFallbackImageLocation(media))
                         .apply(options))
                 .apply(options)

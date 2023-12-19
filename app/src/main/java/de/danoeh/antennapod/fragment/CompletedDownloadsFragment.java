@@ -10,21 +10,20 @@ import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 import com.google.android.material.appbar.MaterialToolbar;
+import androidx.fragment.app.Fragment;
 import com.google.android.material.snackbar.Snackbar;
 import com.leinardi.android.speeddial.SpeedDialView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.adapter.EpisodeItemListAdapter;
 import de.danoeh.antennapod.adapter.actionbutton.DeleteActionButton;
+import de.danoeh.antennapod.core.event.DownloadEvent;
 import de.danoeh.antennapod.core.event.DownloadLogEvent;
 import de.danoeh.antennapod.core.menuhandler.MenuItemUtils;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.util.FeedItemUtil;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
-import de.danoeh.antennapod.dialog.ItemSortDialog;
-import de.danoeh.antennapod.event.EpisodeDownloadEvent;
+import de.danoeh.antennapod.core.util.download.AutoUpdateManager;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.event.UnreadItemsUpdateEvent;
@@ -34,9 +33,6 @@ import de.danoeh.antennapod.fragment.swipeactions.SwipeActions;
 import de.danoeh.antennapod.menuhandler.FeedItemMenuHandler;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
-import de.danoeh.antennapod.model.feed.SortOrder;
-import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.view.EmptyViewHandler;
 import de.danoeh.antennapod.view.EpisodeItemListRecyclerView;
 import de.danoeh.antennapod.view.LiftOnScrollListener;
@@ -50,10 +46,9 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Displays all completed downloads and provides a button to delete them.
@@ -64,7 +59,7 @@ public class CompletedDownloadsFragment extends Fragment
     public static final String ARG_SHOW_LOGS = "show_logs";
     private static final String KEY_UP_ARROW = "up_arrow";
 
-    private Set<String> runningDownloads = new HashSet<>();
+    private long[] runningDownloads = new long[0];
     private List<FeedItem> items = new ArrayList<>();
     private CompletedDownloadsListAdapter adapter;
     private EpisodeItemListRecyclerView recyclerView;
@@ -74,13 +69,12 @@ public class CompletedDownloadsFragment extends Fragment
     private SpeedDialView speedDialView;
     private SwipeActions swipeActions;
     private ProgressBar progressBar;
-    private MaterialToolbar toolbar;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.simple_list_fragment, container, false);
-        toolbar = root.findViewById(R.id.toolbar);
+        MaterialToolbar toolbar = root.findViewById(R.id.toolbar);
         toolbar.setTitle(R.string.downloads_label);
         toolbar.inflateMenu(R.menu.downloads_completed);
         toolbar.setOnMenuItemClickListener(this);
@@ -155,10 +149,6 @@ public class CompletedDownloadsFragment extends Fragment
     public void onDestroyView() {
         EventBus.getDefault().unregister(this);
         adapter.endSelectMode();
-        if (toolbar != null) {
-            toolbar.setOnMenuItemClickListener(null);
-            toolbar.setOnLongClickListener(null);
-        }
         super.onDestroyView();
     }
 
@@ -179,7 +169,7 @@ public class CompletedDownloadsFragment extends Fragment
     @Override
     public boolean onMenuItemClick(MenuItem item) {
         if (item.getItemId() == R.id.refresh_item) {
-            FeedUpdateManager.runOnceOrAsk(requireContext());
+            AutoUpdateManager.runImmediate(requireContext());
             return true;
         } else if (item.getItemId() == R.id.action_download_logs) {
             new DownloadLogFragment().show(getChildFragmentManager(), null);
@@ -187,30 +177,24 @@ public class CompletedDownloadsFragment extends Fragment
         } else if (item.getItemId() == R.id.action_search) {
             ((MainActivity) getActivity()).loadChildFragment(SearchFragment.newInstance());
             return true;
-        } else if (item.getItemId() == R.id.downloads_sort) {
-            new DownloadsSortDialog().show(getChildFragmentManager(), "SortDialog");
-            return true;
         }
         return false;
     }
 
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
-    public void onEventMainThread(EpisodeDownloadEvent event) {
-        Set<String> newRunningDownloads = new HashSet<>();
-        for (String url : event.getUrls()) {
-            if (DownloadServiceInterface.get().isDownloadingEpisode(url)) {
-                newRunningDownloads.add(url);
-            }
-        }
-        if (!newRunningDownloads.equals(runningDownloads)) {
-            runningDownloads = newRunningDownloads;
+    public void onEventMainThread(DownloadEvent event) {
+        Log.d(TAG, "onEventMainThread() called with: " + "event = [" + event + "]");
+        if (!Arrays.equals(event.update.mediaIds, runningDownloads)) {
+            runningDownloads = event.update.mediaIds;
             loadItems();
             return; // Refreshed anyway
         }
-        for (String downloadUrl : event.getUrls()) {
-            int pos = FeedItemUtil.indexOfItemWithDownloadUrl(items, downloadUrl);
-            if (pos >= 0) {
-                adapter.notifyItemChangedCompat(pos);
+        if (event.update.mediaIds.length > 0) {
+            for (long mediaId : event.update.mediaIds) {
+                int pos = FeedItemUtil.indexOfItemWithMediaId(items, mediaId);
+                if (pos >= 0) {
+                    adapter.notifyItemChangedCompat(pos);
+                }
             }
         }
     }
@@ -295,21 +279,18 @@ public class CompletedDownloadsFragment extends Fragment
         }
         emptyView.hide();
         disposable = Observable.fromCallable(() -> {
-            SortOrder sortOrder = UserPreferences.getDownloadsSortedOrder();
-            List<FeedItem> downloadedItems = DBReader.getEpisodes(0, Integer.MAX_VALUE,
-                        new FeedItemFilter(FeedItemFilter.DOWNLOADED), sortOrder);
-
-            List<String> mediaUrls = new ArrayList<>();
+            List<FeedItem> downloadedItems = DBReader.getDownloadedItems();
+            List<Long> mediaIds = new ArrayList<>();
             if (runningDownloads == null) {
                 return downloadedItems;
             }
-            for (String url : runningDownloads) {
-                if (FeedItemUtil.indexOfItemWithDownloadUrl(downloadedItems, url) != -1) {
+            for (long id : runningDownloads) {
+                if (FeedItemUtil.indexOfItemWithMediaId(downloadedItems, id) != -1) {
                     continue; // Already in list
                 }
-                mediaUrls.add(url);
+                mediaIds.add(id);
             }
-            List<FeedItem> currentDownloads = DBReader.getFeedItemsWithUrl(mediaUrls);
+            List<FeedItem> currentDownloads = DBReader.getFeedItemsWithMedia(mediaIds.toArray(new Long[0]));
             currentDownloads.addAll(downloadedItems);
             return currentDownloads;
         })
@@ -364,29 +345,6 @@ public class CompletedDownloadsFragment extends Fragment
                 menu.findItem(R.id.multi_select).setVisible(true);
             }
             MenuItemUtils.setOnClickListeners(menu, CompletedDownloadsFragment.this::onContextItemSelected);
-        }
-    }
-
-    public static class DownloadsSortDialog extends ItemSortDialog {
-        @Override
-        public void onCreate(@Nullable Bundle savedInstanceState) {
-            super.onCreate(savedInstanceState);
-            sortOrder = UserPreferences.getDownloadsSortedOrder();
-        }
-
-        @Override
-        protected void onAddItem(int title, SortOrder ascending, SortOrder descending, boolean ascendingIsDefault) {
-            if (ascending == SortOrder.DATE_OLD_NEW || ascending == SortOrder.DURATION_SHORT_LONG
-                    || ascending == SortOrder.EPISODE_TITLE_A_Z || ascending == SortOrder.SIZE_SMALL_LARGE) {
-                super.onAddItem(title, ascending, descending, ascendingIsDefault);
-            }
-        }
-
-        @Override
-        protected void onSelectionChanged() {
-            super.onSelectionChanged();
-            UserPreferences.setDownloadsSortedOrder(sortOrder);
-            EventBus.getDefault().post(DownloadLogEvent.listUpdated());
         }
     }
 }

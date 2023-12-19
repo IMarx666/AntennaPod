@@ -77,7 +77,7 @@ public class SwipeActionsDialog {
                         && !a.getId().equals(SwipeAction.START_DOWNLOAD)).toList();
                 break;
             case FeedItemlistFragment.TAG:
-                forFragment = context.getString(R.string.individual_subscription);
+                forFragment = context.getString(R.string.feeds_label);
                 keys = Stream.of(keys).filter(a -> !a.getId().equals(SwipeAction.REMOVE_FROM_HISTORY)).toList();
                 break;
             case QueueFragment.TAG:
@@ -156,12 +156,12 @@ public class SwipeActionsDialog {
 
             Drawable icon = DrawableCompat.wrap(AppCompatResources.getDrawable(context, action.getActionIcon()));
             icon.mutate();
-            icon.setTintMode(PorterDuff.Mode.SRC_ATOP);
+            DrawableCompat.setTintMode(icon, PorterDuff.Mode.SRC_ATOP);
             if ((direction == LEFT && leftAction == action) || (direction == RIGHT && rightAction == action)) {
-                icon.setTint(ThemeUtils.getColorFromAttr(context, action.getActionColor()));
+                DrawableCompat.setTint(icon, ThemeUtils.getColorFromAttr(context, action.getActionColor()));
                 item.swipeActionLabel.setTextColor(ThemeUtils.getColorFromAttr(context, action.getActionColor()));
             } else {
-                icon.setTint(ThemeUtils.getColorFromAttr(context, R.attr.action_icon_color));
+                DrawableCompat.setTint(icon, ThemeUtils.getColorFromAttr(context, R.attr.action_icon_color));
             }
             item.swipeIcon.setImageDrawable(icon);
 

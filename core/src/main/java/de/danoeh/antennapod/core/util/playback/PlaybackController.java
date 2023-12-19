@@ -21,6 +21,7 @@ import de.danoeh.antennapod.event.playback.SpeedChangedEvent;
 import de.danoeh.antennapod.model.playback.MediaType;
 import de.danoeh.antennapod.core.feed.util.PlaybackSpeedUtils;
 import de.danoeh.antennapod.core.preferences.PlaybackPreferences;
+import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.core.service.playback.PlaybackService;
 import de.danoeh.antennapod.model.playback.Playable;
 import de.danoeh.antennapod.playback.base.PlaybackServiceMediaPlayer;
@@ -398,6 +399,13 @@ public abstract class PlaybackController {
     }
 
     public void setPlaybackSpeed(float speed) {
+        PlaybackPreferences.setCurrentlyPlayingTemporaryPlaybackSpeed(speed);
+        if (getMedia() != null && getMedia().getMediaType() == MediaType.VIDEO) {
+            UserPreferences.setVideoPlaybackSpeed(speed);
+        } else {
+            UserPreferences.setPlaybackSpeed(speed);
+        }
+
         if (playbackService != null) {
             playbackService.setSpeed(speed);
         } else {
@@ -416,6 +424,17 @@ public abstract class PlaybackController {
             return playbackService.getCurrentPlaybackSpeed();
         } else {
             return PlaybackSpeedUtils.getCurrentPlaybackSpeed(getMedia());
+        }
+    }
+
+    public boolean canDownmix() {
+        return (playbackService != null && playbackService.canDownmix())
+                || UserPreferences.useSonic();
+    }
+
+    public void setDownmix(boolean enable) {
+        if (playbackService != null) {
+            playbackService.setDownmix(enable);
         }
     }
 

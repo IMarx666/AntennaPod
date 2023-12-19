@@ -83,7 +83,7 @@ public class PodcastIndexPodcastSearcher implements PodcastSearcher {
 
     @Override
     public String getName() {
-        return "Podcast Index";
+        return "Podcastindex.org";
     }
 
     private Request buildAuthenticatedRequest(String url) {

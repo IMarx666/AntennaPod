@@ -1,22 +1,12 @@
 package de.danoeh.antennapod.fragment;
 
-import android.Manifest;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.appbar.MaterialToolbar;
 import androidx.fragment.app.Fragment;
@@ -26,7 +16,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SwitchPreferenceCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
+import de.danoeh.antennapod.core.storage.DBTasks;
 import de.danoeh.antennapod.event.settings.SkipIntroEndingChangedEvent;
 import de.danoeh.antennapod.event.settings.SpeedPresetChangedEvent;
 import de.danoeh.antennapod.event.settings.VolumeAdaptionChangedEvent;
@@ -115,7 +105,6 @@ public class FeedSettingsFragment extends Fragment {
         private static final CharSequence PREF_AUTHENTICATION = "authentication";
         private static final CharSequence PREF_AUTO_DELETE = "autoDelete";
         private static final CharSequence PREF_CATEGORY_AUTO_DOWNLOAD = "autoDownloadCategory";
-        private static final CharSequence PREF_NEW_EPISODES_ACTION = "feedNewEpisodesAction";
         private static final String PREF_FEED_PLAYBACK_SPEED = "feedPlaybackSpeed";
         private static final String PREF_AUTO_SKIP = "feedAutoSkip";
         private static final String PREF_TAGS = "tags";
@@ -131,23 +120,6 @@ public class FeedSettingsFragment extends Fragment {
             fragment.setArguments(arguments);
             return fragment;
         }
-
-        boolean notificationPermissionDenied = false;
-        private final ActivityResultLauncher<String> requestPermissionLauncher =
-                registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
-                    if (isGranted) {
-                        return;
-                    }
-                    if (notificationPermissionDenied) {
-                        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                        Uri uri = Uri.fromParts("package", getContext().getPackageName(), null);
-                        intent.setData(uri);
-                        startActivity(intent);
-                        return;
-                    }
-                    Toast.makeText(getContext(), R.string.notification_permission_denied, Toast.LENGTH_LONG).show();
-                    notificationPermissionDenied = true;
-                });
 
         @Override
         public RecyclerView onCreateRecyclerView(LayoutInflater inflater, ViewGroup parent, Bundle state) {
@@ -183,8 +155,7 @@ public class FeedSettingsFragment extends Fragment {
                         setupAutoDownloadPreference();
                         setupKeepUpdatedPreference();
                         setupAutoDeletePreference();
-                        setupVolumeAdaptationPreferences();
-                        setupNewEpisodesAction();
+                        setupVolumeReductionPreferences();
                         setupAuthentificationPreference();
                         setupEpisodeFilterPreference();
                         setupPlaybackSpeedPreference();
@@ -193,12 +164,12 @@ public class FeedSettingsFragment extends Fragment {
                         setupTags();
 
                         updateAutoDeleteSummary();
-                        updateVolumeAdaptationValue();
+                        updateVolumeReductionValue();
                         updateAutoDownloadEnabled();
-                        updateNewEpisodesAction();
 
                         if (feed.isLocalFeed()) {
                             findPreference(PREF_AUTHENTICATION).setVisible(false);
+                            findPreference(PREF_AUTO_DELETE).setVisible(false);
                             findPreference(PREF_CATEGORY_AUTO_DOWNLOAD).setVisible(false);
                         }
 
@@ -296,7 +267,8 @@ public class FeedSettingsFragment extends Fragment {
                             } catch (InterruptedException | ExecutionException e) {
                                 e.printStackTrace();
                             }
-                            FeedUpdateManager.runOnce(getContext(), feed);
+
+                            DBTasks.forceRefreshFeed(requireContext(), feed, true);
                         }, "RefreshAfterCredentialChange").start();
                     }
                 }.show();
@@ -311,12 +283,11 @@ public class FeedSettingsFragment extends Fragment {
                         feedPreferences.setAutoDeleteAction(FeedPreferences.AutoDeleteAction.GLOBAL);
                         break;
                     case "always":
-                        feedPreferences.setAutoDeleteAction(FeedPreferences.AutoDeleteAction.ALWAYS);
+                        feedPreferences.setAutoDeleteAction(FeedPreferences.AutoDeleteAction.YES);
                         break;
                     case "never":
-                        feedPreferences.setAutoDeleteAction(FeedPreferences.AutoDeleteAction.NEVER);
+                        feedPreferences.setAutoDeleteAction(FeedPreferences.AutoDeleteAction.NO);
                         break;
-                    default:
                 }
                 DBWriter.setFeedPreferences(feedPreferences);
                 updateAutoDeleteSummary();
@@ -329,23 +300,23 @@ public class FeedSettingsFragment extends Fragment {
 
             switch (feedPreferences.getAutoDeleteAction()) {
                 case GLOBAL:
-                    autoDeletePreference.setSummary(R.string.global_default);
+                    autoDeletePreference.setSummary(R.string.feed_auto_download_global);
                     autoDeletePreference.setValue("global");
                     break;
-                case ALWAYS:
+                case YES:
                     autoDeletePreference.setSummary(R.string.feed_auto_download_always);
                     autoDeletePreference.setValue("always");
                     break;
-                case NEVER:
+                case NO:
                     autoDeletePreference.setSummary(R.string.feed_auto_download_never);
                     autoDeletePreference.setValue("never");
                     break;
             }
         }
 
-        private void setupVolumeAdaptationPreferences() {
-            ListPreference volumeAdaptationPreference = findPreference("volumeReduction");
-            volumeAdaptationPreference.setOnPreferenceChangeListener((preference, newValue) -> {
+        private void setupVolumeReductionPreferences() {
+            ListPreference volumeReductionPreference = findPreference("volumeReduction");
+            volumeReductionPreference.setOnPreferenceChangeListener((preference, newValue) -> {
                 switch ((String) newValue) {
                     case "off":
                         feedPreferences.setVolumeAdaptionSetting(VolumeAdaptionSetting.OFF);
@@ -356,75 +327,28 @@ public class FeedSettingsFragment extends Fragment {
                     case "heavy":
                         feedPreferences.setVolumeAdaptionSetting(VolumeAdaptionSetting.HEAVY_REDUCTION);
                         break;
-                    case "light_boost":
-                        feedPreferences.setVolumeAdaptionSetting(VolumeAdaptionSetting.LIGHT_BOOST);
-                        break;
-                    case "medium_boost":
-                        feedPreferences.setVolumeAdaptionSetting(VolumeAdaptionSetting.MEDIUM_BOOST);
-                        break;
-                    case "heavy_boost":
-                        feedPreferences.setVolumeAdaptionSetting(VolumeAdaptionSetting.HEAVY_BOOST);
-                        break;
-                    default:
                 }
                 DBWriter.setFeedPreferences(feedPreferences);
-                updateVolumeAdaptationValue();
+                updateVolumeReductionValue();
                 EventBus.getDefault().post(
                         new VolumeAdaptionChangedEvent(feedPreferences.getVolumeAdaptionSetting(), feed.getId()));
                 return false;
             });
         }
 
-        private void updateVolumeAdaptationValue() {
-            ListPreference volumeAdaptationPreference = findPreference("volumeReduction");
+        private void updateVolumeReductionValue() {
+            ListPreference volumeReductionPreference = findPreference("volumeReduction");
 
             switch (feedPreferences.getVolumeAdaptionSetting()) {
                 case OFF:
-                    volumeAdaptationPreference.setValue("off");
+                    volumeReductionPreference.setValue("off");
                     break;
                 case LIGHT_REDUCTION:
-                    volumeAdaptationPreference.setValue("light");
+                    volumeReductionPreference.setValue("light");
                     break;
                 case HEAVY_REDUCTION:
-                    volumeAdaptationPreference.setValue("heavy");
+                    volumeReductionPreference.setValue("heavy");
                     break;
-                case LIGHT_BOOST:
-                    volumeAdaptationPreference.setValue("light_boost");
-                    break;
-                case MEDIUM_BOOST:
-                    volumeAdaptationPreference.setValue("medium_boost");
-                    break;
-                case HEAVY_BOOST:
-                    volumeAdaptationPreference.setValue("heavy_boost");
-                    break;
-            }
-        }
-
-        private void setupNewEpisodesAction() {
-            findPreference(PREF_NEW_EPISODES_ACTION).setOnPreferenceChangeListener((preference, newValue) -> {
-                int code = Integer.parseInt((String) newValue);
-                feedPreferences.setNewEpisodesAction(FeedPreferences.NewEpisodesAction.fromCode(code));
-                DBWriter.setFeedPreferences(feedPreferences);
-                updateNewEpisodesAction();
-                return false;
-            });
-        }
-
-        private void updateNewEpisodesAction() {
-            ListPreference newEpisodesAction = findPreference(PREF_NEW_EPISODES_ACTION);
-            newEpisodesAction.setValue("" + feedPreferences.getNewEpisodesAction().code);
-
-            switch (feedPreferences.getNewEpisodesAction()) {
-                case GLOBAL:
-                    newEpisodesAction.setSummary(R.string.global_default);
-                    break;
-                case ADD_TO_INBOX:
-                    newEpisodesAction.setSummary(R.string.feed_new_episodes_action_add_to_inbox);
-                    break;
-                case NOTHING:
-                    newEpisodesAction.setSummary(R.string.feed_new_episodes_action_nothing);
-                    break;
-                default:
             }
         }
 
@@ -493,11 +417,6 @@ public class FeedSettingsFragment extends Fragment {
 
             pref.setChecked(feedPreferences.getShowEpisodeNotification());
             pref.setOnPreferenceChangeListener((preference, newValue) -> {
-                if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(getContext(),
-                        Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
-                    return false;
-                }
                 boolean checked = newValue == Boolean.TRUE;
                 feedPreferences.setShowEpisodeNotification(checked);
                 DBWriter.setFeedPreferences(feedPreferences);

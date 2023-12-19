@@ -18,7 +18,6 @@ import de.danoeh.antennapod.core.export.ExportWriter;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.core.storage.DBReader;
-import de.danoeh.antennapod.model.feed.SortOrder;
 
 /** Writes saved favorites to file. */
 public class FavoritesWriter implements ExportWriter {
@@ -43,8 +42,8 @@ public class FavoritesWriter implements ExportWriter {
         InputStream feedTemplateStream = context.getAssets().open(FEED_TEMPLATE);
         String feedTemplate = IOUtils.toString(feedTemplateStream, UTF_8);
 
-        List<FeedItem> allFavorites = DBReader.getEpisodes(0, Integer.MAX_VALUE,
-                new FeedItemFilter(FeedItemFilter.IS_FAVORITE), SortOrder.DATE_NEW_OLD);
+        List<FeedItem> allFavorites = DBReader.getRecentlyPublishedEpisodes(0, Integer.MAX_VALUE,
+                new FeedItemFilter(FeedItemFilter.IS_FAVORITE));
         Map<Long, List<FeedItem>> favoriteByFeed = getFeedMap(allFavorites);
 
         writer.append(templateParts[0]);

@@ -22,56 +22,48 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import com.google.android.material.appbar.MaterialToolbar;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentContainerView;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.work.WorkInfo;
-import androidx.work.WorkManager;
 import com.bumptech.glide.Glide;
-import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.snackbar.Snackbar;
-import de.danoeh.antennapod.R;
+
 import de.danoeh.antennapod.core.preferences.ThemeSwitcher;
-import de.danoeh.antennapod.core.receiver.MediaButtonReceiver;
-import de.danoeh.antennapod.core.sync.queue.SynchronizationQueueSink;
-import de.danoeh.antennapod.core.util.download.FeedUpdateManager;
-import de.danoeh.antennapod.dialog.RatingDialog;
-import de.danoeh.antennapod.event.EpisodeDownloadEvent;
-import de.danoeh.antennapod.event.FeedUpdateRunningEvent;
-import de.danoeh.antennapod.event.MessageEvent;
-import de.danoeh.antennapod.fragment.AddFeedFragment;
 import de.danoeh.antennapod.fragment.AllEpisodesFragment;
-import de.danoeh.antennapod.fragment.AudioPlayerFragment;
-import de.danoeh.antennapod.fragment.CompletedDownloadsFragment;
-import de.danoeh.antennapod.fragment.DownloadLogFragment;
-import de.danoeh.antennapod.fragment.FeedItemlistFragment;
-import de.danoeh.antennapod.fragment.InboxFragment;
-import de.danoeh.antennapod.fragment.NavDrawerFragment;
-import de.danoeh.antennapod.fragment.PlaybackHistoryFragment;
-import de.danoeh.antennapod.fragment.QueueFragment;
-import de.danoeh.antennapod.fragment.SearchFragment;
-import de.danoeh.antennapod.fragment.SubscriptionFragment;
-import de.danoeh.antennapod.fragment.TransitionEffect;
-import de.danoeh.antennapod.model.download.DownloadStatus;
-import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
-import de.danoeh.antennapod.playback.cast.CastEnabledActivity;
-import de.danoeh.antennapod.storage.preferences.UserPreferences;
-import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
-import de.danoeh.antennapod.ui.common.ThemeUtils;
-import de.danoeh.antennapod.ui.home.HomeFragment;
-import de.danoeh.antennapod.view.LockableBottomSheetBehavior;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.Validate;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import java.util.HashMap;
-import java.util.Map;
+import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.core.receiver.MediaButtonReceiver;
+import de.danoeh.antennapod.core.util.download.AutoUpdateManager;
+import de.danoeh.antennapod.dialog.RatingDialog;
+import de.danoeh.antennapod.event.MessageEvent;
+import de.danoeh.antennapod.fragment.AddFeedFragment;
+import de.danoeh.antennapod.fragment.AudioPlayerFragment;
+import de.danoeh.antennapod.fragment.CompletedDownloadsFragment;
+import de.danoeh.antennapod.fragment.InboxFragment;
+import de.danoeh.antennapod.fragment.FeedItemlistFragment;
+import de.danoeh.antennapod.fragment.NavDrawerFragment;
+import de.danoeh.antennapod.fragment.PlaybackHistoryFragment;
+import de.danoeh.antennapod.fragment.QueueFragment;
+import de.danoeh.antennapod.fragment.SearchFragment;
+import de.danoeh.antennapod.fragment.SubscriptionFragment;
+import de.danoeh.antennapod.fragment.TransitionEffect;
+import de.danoeh.antennapod.playback.cast.CastEnabledActivity;
+import de.danoeh.antennapod.preferences.PreferenceUpgrader;
+import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
+import de.danoeh.antennapod.ui.common.ThemeUtils;
+import de.danoeh.antennapod.ui.home.HomeFragment;
+import de.danoeh.antennapod.view.LockableBottomSheetBehavior;
 
 /**
  * The activity that is shown when the user launches the app.
@@ -84,6 +76,8 @@ public class MainActivity extends CastEnabledActivity {
     public static final String PREF_NAME = "MainActivityPrefs";
     public static final String PREF_IS_FIRST_LAUNCH = "prefMainActivityIsFirstLaunch";
 
+    public static final String EXTRA_FRAGMENT_TAG = "fragment_tag";
+    public static final String EXTRA_FRAGMENT_ARGS = "fragment_args";
     public static final String EXTRA_FEED_ID = "fragment_feed_id";
     public static final String EXTRA_REFRESH_ON_START = "refresh_on_start";
     public static final String EXTRA_STARTED_FROM_SEARCH = "started_from_search";
@@ -160,60 +154,11 @@ public class MainActivity extends CastEnabledActivity {
         transaction.commit();
 
         checkFirstLaunch();
+        PreferenceUpgrader.checkUpgrades(this);
         View bottomSheet = findViewById(R.id.audioplayerFragment);
         sheetBehavior = (LockableBottomSheetBehavior) BottomSheetBehavior.from(bottomSheet);
         sheetBehavior.setHideable(false);
         sheetBehavior.setBottomSheetCallback(bottomSheetCallback);
-
-        FeedUpdateManager.restartUpdateAlarm(this, false);
-        SynchronizationQueueSink.syncNowIfNotSyncedRecently();
-
-        WorkManager.getInstance(this)
-                .getWorkInfosByTagLiveData(FeedUpdateManager.WORK_TAG_FEED_UPDATE)
-                .observe(this, workInfos -> {
-                    boolean isRefreshingFeeds = false;
-                    for (WorkInfo workInfo : workInfos) {
-                        if (workInfo.getState() == WorkInfo.State.RUNNING) {
-                            isRefreshingFeeds = true;
-                        } else if (workInfo.getState() == WorkInfo.State.ENQUEUED) {
-                            isRefreshingFeeds = true;
-                        }
-                    }
-                    EventBus.getDefault().postSticky(new FeedUpdateRunningEvent(isRefreshingFeeds));
-                });
-        WorkManager.getInstance(this)
-                .getWorkInfosByTagLiveData(DownloadServiceInterface.WORK_TAG)
-                .observe(this, workInfos -> {
-                    Map<String, DownloadStatus> updatedEpisodes = new HashMap<>();
-                    for (WorkInfo workInfo : workInfos) {
-                        String downloadUrl = null;
-                        for (String tag : workInfo.getTags()) {
-                            if (tag.startsWith(DownloadServiceInterface.WORK_TAG_EPISODE_URL)) {
-                                downloadUrl = tag.substring(DownloadServiceInterface.WORK_TAG_EPISODE_URL.length());
-                            }
-                        }
-                        if (downloadUrl == null) {
-                            continue;
-                        }
-                        int status;
-                        if (workInfo.getState() == WorkInfo.State.RUNNING) {
-                            status = DownloadStatus.STATE_RUNNING;
-                        } else if (workInfo.getState() == WorkInfo.State.ENQUEUED
-                                || workInfo.getState() == WorkInfo.State.BLOCKED) {
-                            status = DownloadStatus.STATE_QUEUED;
-                        } else {
-                            status = DownloadStatus.STATE_COMPLETED;
-                        }
-                        int progress = workInfo.getProgress().getInt(DownloadServiceInterface.WORK_DATA_PROGRESS, -1);
-                        if (progress == -1 && status != DownloadStatus.STATE_COMPLETED) {
-                            status = DownloadStatus.STATE_QUEUED;
-                            progress = 0;
-                        }
-                        updatedEpisodes.put(downloadUrl, new DownloadStatus(status, progress));
-                    }
-                    DownloadServiceInterface.get().setCurrentDownloads(updatedEpisodes);
-                    EventBus.getDefault().postSticky(new EpisodeDownloadEvent(updatedEpisodes));
-                });
     }
 
     @Override
@@ -287,18 +232,12 @@ public class MainActivity extends CastEnabledActivity {
         }
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (drawerLayout != null) {
-            drawerLayout.removeDrawerListener(drawerToggle);
-        }
-    }
-
     private void checkFirstLaunch() {
         SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
         if (prefs.getBoolean(PREF_IS_FIRST_LAUNCH, true)) {
-            FeedUpdateManager.restartUpdateAlarm(this, true);
+            // for backward compatibility, we only change defaults for fresh installs
+            UserPreferences.setUpdateInterval(12);
+            AutoUpdateManager.restartUpdateAlarm(this);
 
             SharedPreferences.Editor edit = prefs.edit();
             edit.putBoolean(PREF_IS_FIRST_LAUNCH, false);
@@ -333,10 +272,6 @@ public class MainActivity extends CastEnabledActivity {
         params.setMargins(navigationBarInsets.left, 0, navigationBarInsets.right,
                 navigationBarInsets.bottom + (visible ? externalPlayerHeight : 0));
         mainView.setLayoutParams(params);
-        FragmentContainerView playerView = findViewById(R.id.playerFragment);
-        ViewGroup.MarginLayoutParams playerParams = (ViewGroup.MarginLayoutParams) playerView.getLayoutParams();
-        playerParams.setMargins(navigationBarInsets.left, 0, navigationBarInsets.right, 0);
-        playerView.setLayoutParams(playerParams);
         findViewById(R.id.audioplayerFragment).setVisibility(visible ? View.VISIBLE : View.GONE);
     }
 
@@ -506,9 +441,6 @@ public class MainActivity extends CastEnabledActivity {
             finish();
             startActivity(new Intent(this, MainActivity.class));
         }
-        if (UserPreferences.getHiddenDrawerItems().contains(NavDrawerFragment.getLastNavFragment(this))) {
-            loadFragment(UserPreferences.getDefaultPage(), null);
-        }
     }
 
     @Override
@@ -576,19 +508,27 @@ public class MainActivity extends CastEnabledActivity {
     public void onEventMainThread(MessageEvent event) {
         Log.d(TAG, "onEvent(" + event + ")");
 
-        Snackbar snackbar = showSnackbarAbovePlayer(event.message, Snackbar.LENGTH_LONG);
+        Snackbar snackbar = showSnackbarAbovePlayer(event.message, Snackbar.LENGTH_SHORT);
         if (event.action != null) {
-            snackbar.setAction(event.actionText, v -> event.action.accept(this));
+            snackbar.setAction(getString(R.string.undo), v -> event.action.run());
         }
     }
 
     private void handleNavIntent() {
-        Log.d(TAG, "handleNavIntent()");
         Intent intent = getIntent();
-        if (intent.hasExtra(EXTRA_FEED_ID)) {
+        if (intent.hasExtra(EXTRA_FEED_ID) || intent.hasExtra(EXTRA_FRAGMENT_TAG) || intent.hasExtra(EXTRA_REFRESH_ON_START)) {
+            Log.d(TAG, "handleNavIntent()");
+            String tag = intent.getStringExtra(EXTRA_FRAGMENT_TAG);
+            Bundle args = intent.getBundleExtra(EXTRA_FRAGMENT_ARGS);
+            boolean refreshOnStart = intent.getBooleanExtra(EXTRA_REFRESH_ON_START, false);
+            if (refreshOnStart) {
+                AutoUpdateManager.runImmediate(this);
+            }
+
             long feedId = intent.getLongExtra(EXTRA_FEED_ID, 0);
-            Bundle args = intent.getBundleExtra(MainActivityStarter.EXTRA_FRAGMENT_ARGS);
-            if (feedId > 0) {
+            if (tag != null) {
+                loadFragment(tag, args);
+            } else if (feedId > 0) {
                 boolean startedFromSearch = intent.getBooleanExtra(EXTRA_STARTED_FROM_SEARCH, false);
                 boolean addToBackStack = intent.getBooleanExtra(EXTRA_ADD_TO_BACK_STACK, false);
                 if (startedFromSearch || addToBackStack) {
@@ -598,28 +538,11 @@ public class MainActivity extends CastEnabledActivity {
                 }
             }
             sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
-        } else if (intent.hasExtra(MainActivityStarter.EXTRA_FRAGMENT_TAG)) {
-            String tag = intent.getStringExtra(MainActivityStarter.EXTRA_FRAGMENT_TAG);
-            Bundle args = intent.getBundleExtra(MainActivityStarter.EXTRA_FRAGMENT_ARGS);
-            if (tag != null) {
-                loadFragment(tag, args);
-            }
-            sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
         } else if (intent.getBooleanExtra(MainActivityStarter.EXTRA_OPEN_PLAYER, false)) {
             sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
             bottomSheetCallback.onSlide(null, 1.0f);
-        } else {
+        } else if (Intent.ACTION_VIEW.equals(intent.getAction())) {
             handleDeeplink(intent.getData());
-        }
-
-        if (intent.getBooleanExtra(MainActivityStarter.EXTRA_OPEN_DRAWER, false) && drawerLayout != null) {
-            drawerLayout.open();
-        }
-        if (intent.getBooleanExtra(MainActivityStarter.EXTRA_OPEN_DOWNLOAD_LOGS, false)) {
-            new DownloadLogFragment().show(getSupportFragmentManager(), null);
-        }
-        if (intent.getBooleanExtra(EXTRA_REFRESH_ON_START, false)) {
-            FeedUpdateManager.runOnceOrAsk(this);
         }
         // to avoid handling the intent twice when the configuration changes
         setIntent(new Intent(MainActivity.this, MainActivity.class));
